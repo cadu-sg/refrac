@@ -1,30 +1,107 @@
 package com.botoseis.storage;
 
-//import java.io.IOException;
-//import java.nio.file.Files;
-//import java.nio.file.Path;
-//import java.nio.file.Paths;
-//import java.nio.file.StandardCopyOption;
-//import java.util.List;
+import com.botoseis.structs.Shot;
+import com.botoseis.structs.Station;
+import javafx.geometry.Point2D;
 
-public class Line {
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 
-//    private final Path homeDir;
-//    private final int shotAmount;
-//    private final List<Station> stations;
-//    private final int stationAmount;
-//
-//    public static Line create(Path homeDir, Path picksFile) throws IOException, IllegalArgumentException {
-//        // Create home dir making parent directories as needed
-//        try {
-//            Files.createDirectories(homeDir);
-//        } catch (IOException e) {
-//            throw new IOException("Cannot create line home directory", e);
-//        }
-//        // Copy picks origin to home dir
-//        Path picksTxtPath = Files.copy(picksFile,
-//                Paths.get(homeDir.toString(), "picks_origin.dat"),
-//                StandardCopyOption.REPLACE_EXISTING);
-//    }
+public final class Line {
+
+    private final Path homeDir;
+
+    public Path getHomeDir() {
+        return homeDir;
+    }
+
+    private final PicksTxt picksTxt;
+    private final PicksBin picksBin;
+    private final DrawPointsBin drawPointsBin;
+
+    public int getShotAmount() {
+        return picksTxt.getShotAmount();
+    }
+
+    public Station[] getStations() {
+        return picksTxt.getStations();
+    }
+
+    public int getStationAmount() {
+        return picksTxt.getStationAmount();
+    }
+
+    public void saveShot(Shot shot, int shotIndex) throws IOException {
+        picksBin.saveShot(shot, shotIndex);
+    }
+
+    public Shot loadShot(int shotIndex) throws IOException {
+        return picksBin.loadShot(shotIndex);
+    }
+
+    public void saveDrawPoints(Point2D[] points, int shotIndex) throws IOException, IllegalArgumentException {
+        drawPointsBin.save(points, shotIndex);
+    }
+
+    public Point2D[] loadDrawPoints(int shotIndex) throws IOException {
+        return drawPointsBin.load(shotIndex);
+    }
+
+    private Line(Path homeDir, PicksTxt picksTxt, PicksBin picksBin, DrawPointsBin drawPointsBin) {
+        this.homeDir = homeDir;
+        this.picksTxt = picksTxt;
+        this.picksBin = picksBin;
+        this.drawPointsBin = drawPointsBin;
+    }
+
+    public static Line create(Path homeDir, Path picksFile) throws IOException, IllegalArgumentException {
+
+        // Create line home dir
+        try {
+            Files.createDirectories(homeDir);
+        } catch (IOException e) {
+            throw new IOException("Cannot create line home directory", e);
+        }
+
+        // Copy picks file to home dir
+        Path picksTxtPath = Files.copy(picksFile,
+                Paths.get(homeDir.toString(), "picks_origin.dat"),
+                StandardCopyOption.REPLACE_EXISTING);
+        // Open picks text file
+        PicksTxt picksTxt = PicksTxt.open(picksTxtPath);
+
+        int shotAmount = picksTxt.getShotAmount();
+
+        // Picks binary file
+        PicksBin picksBin = picksTxt.createPicksBin(
+                Paths.get(homeDir.toString(), "picks.bin"));
+
+        // Drawing points binary file
+        DrawPointsBin drawPointsBin = DrawPointsBin.create(
+                Paths.get(homeDir.toString(), "draw_points.bin"), shotAmount);
+
+        // Interpretations CSV file
+        Path interpretationsPath = Paths.get(homeDir.toString(), "interpretations.csv");
+
+        return new Line(homeDir, picksTxt, picksBin, drawPointsBin);
+    }
+
+    public static Line open(Path homeDir) throws IOException, IllegalArgumentException {
+
+        PicksTxt picksTxt = PicksTxt.open(
+                Paths.get(homeDir.toString(), "picks_origin.dat"));
+
+        PicksBin picksBin = PicksBin.open(
+                Paths.get(homeDir.toString(), "picks.bin"));
+
+        DrawPointsBin drawPointsBin = DrawPointsBin.open(
+                Paths.get(homeDir.toString(), "drawings.bin"));
+
+        return new Line(homeDir, picksTxt, picksBin, drawPointsBin);
+    }
+
 
 }
