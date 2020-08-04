@@ -14,9 +14,11 @@ import java.io.IOException;
 public class App extends Application {
 
     private static Scene scene;
+    public static Stage stage;
 
     @Override
     public void start(Stage stage) throws IOException {
+        App.stage = stage;
         FXMLLoader fxmlLoader = new FXMLLoader(App.class.getResource("scenes/main/main.fxml"));
         Parent parent = fxmlLoader.load();
         scene = new Scene(parent);
@@ -38,4 +40,7 @@ public class App extends Application {
         launch();
     }
 
+    public static Stage getStage() {
+        return stage;
+    }
 }
