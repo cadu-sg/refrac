@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
@@ -45,6 +46,10 @@ public class DrawPointsBin {
             ByteBuffer byteBuffer = ByteBuffer.allocate(SHOTAMOUNT_SIZE);
             byteChannel.read(byteBuffer);
             shotAmount = byteBuffer.getInt(0);
+        } catch (NoSuchFileException e) {
+            throw new IllegalArgumentException("Cannot read draw_points.bin: no such file", e);
+        } catch (IOException e) {
+            throw new IOException("Cannot read draw_points.bin: an IO exception occurred", e);
         }
         if (Files.size(drawingPointsPath) != SHOTAMOUNT_SIZE + POINTS_GROUP_SIZE * shotAmount) {
             throw new IllegalArgumentException("Cannot open points file: invalid file");

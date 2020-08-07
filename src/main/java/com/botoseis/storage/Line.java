@@ -18,6 +18,10 @@ public final class Line {
         return homeDir;
     }
 
+    public String getTitle() {
+        return homeDir.getFileName().toString();
+    }
+
     private final PicksTxt picksTxt;
     private final PicksBin picksBin;
     private final DrawPointsBin drawPointsBin;
@@ -50,6 +54,7 @@ public final class Line {
         return drawPointsBin.load(shotIndex);
     }
 
+
     private Line(Path homeDir, PicksTxt picksTxt, PicksBin picksBin, DrawPointsBin drawPointsBin) {
         this.homeDir = homeDir;
         this.picksTxt = picksTxt;
@@ -63,7 +68,7 @@ public final class Line {
         try {
             Files.createDirectories(homeDir);
         } catch (IOException e) {
-            throw new IOException("Cannot create line home directory", e);
+            throw new IOException(String.format("Cannot create directory: %s", homeDir), e);
         }
 
         // Copy picks file to home dir
@@ -98,7 +103,7 @@ public final class Line {
                 Paths.get(homeDir.toString(), "picks.bin"));
 
         DrawPointsBin drawPointsBin = DrawPointsBin.open(
-                Paths.get(homeDir.toString(), "drawings.bin"));
+                Paths.get(homeDir.toString(), "draw_points.bin"));
 
         return new Line(homeDir, picksTxt, picksBin, drawPointsBin);
     }

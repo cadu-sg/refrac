@@ -1,46 +1,342 @@
 package com.botoseis.scenes.main;
 
 import com.botoseis.App;
+import com.botoseis.chart.PickChart;
 import com.botoseis.scenes.main.dialogs.NewLineDialog;
+import com.botoseis.scenes.main.dialogs.NewProjectDialog;
+import com.botoseis.storage.Line;
+import com.botoseis.storage.Project;
+import com.botoseis.structs.Shot;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.scene.control.*;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.layout.StackPane;
 import javafx.stage.DirectoryChooser;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public class MainController {
 
+    private Project project;
+    private BooleanProperty projectLoaded;
+    private Line line;
+    private BooleanProperty lineLoaded;
+    private PickChart pickChart;
+    private static final Path USER_HOME = Paths.get(System.getProperty("user.home"));
+
+    private int mainShotIndex;
+    private int amountLoadedShots;
+    private int shotAmount;
+
+    private Shot mainShot;
+    private List<Shot> loadedShots;
+
+    @FXML
+    private Menu menu_line;
+    @FXML
+    private ToolBar container_toolbar;
+    @FXML
+    private StackPane container_pickChart;
+
+    @FXML
+    private Label label_seqNum;
+    @FXML
+    private Label label_shotStat;
+
+    @FXML
+    private TextField textField_seqNum;
+
+    @FXML
+    private TextField textField_amountLoadedShots;
+
     @FXML
     public void initialize() {
-        System.out.println("Hello world!");
+        projectLoaded = new SimpleBooleanProperty(false);
+        projectLoaded.addListener((observable, oldValue, newValue) -> {
+            if (newValue) {
+                handleProjectLoaded();
+            } else {
+                handleProjectUnloaded();
+            }
+        });
+        lineLoaded = new SimpleBooleanProperty(false);
+        lineLoaded.addListener((observable, oldValue, newValue) -> {
+            if (newValue) {
+                handleLineLoaded();
+            } else {
+                handleLineUnloaded();
+            }
+        });
+        loadedShots = new ArrayList<>();
+    }
+
+    private void handleProjectLoaded() {
+        menu_line.setDisable(false);
+    }
+
+    private void handleProjectUnloaded() {
+        menu_line.setDisable(true);
+        lineLoaded.set(false);
+        project = null;
+    }
+
+    private void handleLineLoaded() {
+        toggleLineLoadedContainers(true);
+
+        pickChart = new PickChart(container_pickChart);
+        shotAmount = line.getShotAmount();
+        mainShotIndex = 0;
+        amountLoadedShots = 1;
+        updatePlot();
+    }
+
+    private void handleLineUnloaded() {
+        toggleLineLoadedContainers(false);
+
+        container_pickChart.getChildren().clear();
+        pickChart = null;
+    }
+
+    private void toggleLineLoadedContainers(boolean value) {
+        container_toolbar.setDisable(!value);
+    }
+
+    /**
+     * Plots the current pickChart to plot using the new values of mainShotIndex and amountLoadedShots,
+     * and also updates all relevant elements of the scene to correspond to the new plot
+     */
+    private void updatePlot() {
+        try {
+            updateLoadedShots();
+
+            plotLoadedShots();
+
+        } catch (IOException e) {
+            showErrorAlert("Cannot load shots", e.getMessage());
+        }
+    }
+
+
+    private void updateLoadedShots() throws IOException {
+        loadedShots.clear();
+        if (amountLoadedShots == 1) {
+            // Loading a single shot
+            mainShot = line.loadShot(mainShotIndex);
+            loadedShots.add(mainShot);
+            // Update labels
+            label_seqNum.setText(String.valueOf(mainShotIndex + 1));
+            label_shotStat.setText(String.valueOf(mainShot.souStat));
+        } else {
+            // Loading two or more shots
+            int firstShotIndex = mainShotIndex - (amountLoadedShots - 1) / 2;
+            int lastShotIndex = mainShotIndex + (amountLoadedShots - 1) / 2;
+            if (firstShotIndex < 0) firstShotIndex = 0;
+            if (lastShotIndex >= shotAmount) lastShotIndex = shotAmount - 1;
+            for (int shotIndex = firstShotIndex; shotIndex <= lastShotIndex; shotIndex++) {
+                Shot shot = line.loadShot(shotIndex);
+                if (shotIndex == mainShotIndex) {
+                    mainShot = shot;
+                }
+                loadedShots.add(shot);
+            }
+            // Update labels
+            label_seqNum.setText((firstShotIndex + 1) + " to " + (lastShotIndex + 1));
+            label_shotStat.setText(loadedShots.get(0).souStat + "to"
+                    + loadedShots.get(loadedShots.size() - 1).souStat);
+        }
+        // Update text fields
+        textField_seqNum.setText(String.valueOf(mainShotIndex + 1));
+        textField_amountLoadedShots.setText(String.valueOf(amountLoadedShots));
+    }
+
+    /**
+     * Plots shots from loadedShots
+     */
+    private void plotLoadedShots() {
+        if (loadedShots.size() == 1) {
+            pickChart.plot(mainShot);
+        } else {
+            pickChart.plot(loadedShots, mainShot);
+        }
+    }
+
+    private void showErrorAlert(String headerText, String contentText) {
+        Alert alert = new Alert(AlertType.ERROR);
+        alert.setTitle("Error");
+        alert.setHeaderText(headerText);
+        alert.setContentText(contentText);
+        alert.showAndWait();
     }
 
     // EVENT HANDLER METHODS
 
     @FXML
-    public void openLine(ActionEvent event) {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Open Line");
-
-        // Show directory selection dialog and perform these actions if there was a selection
-        Optional.ofNullable(directoryChooser.showDialog(App.getStage())).ifPresent(lineHome -> {
-            System.out.println("Line location: " + lineHome);
+    public void onNewProject(ActionEvent event) {
+        new NewProjectDialog().showAndWait().ifPresent(projectHomeDir -> {
+            try {
+                project = Project.create(projectHomeDir);
+                // Unload project if it was already loaded
+                if (projectLoaded.get()) {
+                    projectLoaded.set(false);
+                }
+                projectLoaded.set(true);
+                System.out.println("Project title: " + project.getTitle());
+                System.out.println("Project folder: " + project.getHomeDir());
+            } catch (IOException e) {
+                Alert alert = new Alert(AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText("Cannot create project");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
         });
         event.consume();
     }
 
     @FXML
-    public void newLine(ActionEvent event) {
-        NewLineDialog newLineDialog = new NewLineDialog();
-        newLineDialog.showAndWait().ifPresent(lineForm -> {
-            String lineTitle = lineForm[0];
-            Path picksFile = Paths.get(lineForm[1]);
-            System.out.println("Line title: " + lineTitle);
-            System.out.println("Picks file: " + picksFile);
+    public void onOpenProject(ActionEvent event) {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Open Project");
+        directoryChooser.setInitialDirectory(USER_HOME.toFile());
+        Optional.ofNullable(directoryChooser.showDialog(App.getStage())).ifPresent(projectHome -> {
+            try {
+                project = Project.open(projectHome.toPath());
+                // Unload project if it was already loaded
+                if (projectLoaded.get()) {
+                    projectLoaded.set(false);
+                }
+                projectLoaded.set(true);
+                System.out.println("Project title: " + project.getTitle());
+                System.out.println("Project folder: " + project.getHomeDir());
+            } catch (Exception e) {
+                Alert alert = new Alert(AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText("Cannot open project");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
         });
         event.consume();
+    }
+
+    public void onCloseProject(ActionEvent event) {
+        projectLoaded.set(false);
+        event.consume();
+    }
+
+    @FXML
+    public void onNewLine(ActionEvent event) {
+        new NewLineDialog().showAndWait().ifPresent(lineForm -> {
+            try {
+                String lineTitle = lineForm[0];
+                Path picksFile = Paths.get(lineForm[1]);
+                line = project.createLine(lineTitle, picksFile);
+                // Unload line if it was already loaded
+                if (lineLoaded.get()) {
+                    lineLoaded.set(false);
+                }
+                lineLoaded.set(true);
+                System.out.println("Line title: " + lineTitle);
+                System.out.println("Picks file: " + picksFile);
+            } catch (IOException | IllegalArgumentException e) {
+                Alert alert = new Alert(AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText("Cannot create line");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        });
+        event.consume();
+    }
+
+    @FXML
+    public void onOpenLine(ActionEvent event) {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Open Line");
+        directoryChooser.setInitialDirectory(project.getHomeDir().toFile());
+        Optional.ofNullable(directoryChooser.showDialog(App.getStage())).ifPresent(lineHome -> {
+            try {
+                line = project.openLine(lineHome.toPath());
+                // Unload line if it was already loaded
+                if (lineLoaded.get()) {
+                    lineLoaded.set(false);
+                }
+                lineLoaded.set(true);
+                System.out.println("Line title: " + line.getTitle());
+                System.out.println("Line folder: " + line.getHomeDir());
+            } catch (IOException | IllegalArgumentException e) {
+                Alert alert = new Alert(AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText("Cannot open line");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        });
+        event.consume();
+    }
+
+    @FXML
+    public void onCloseLine(ActionEvent event) {
+        lineLoaded.set(false);
+        event.consume();
+    }
+
+    @FXML
+    public void onPreviousShot(ActionEvent event) {
+        if (mainShotIndex != 0) {
+            mainShotIndex--;
+            updatePlot();
+        }
+        event.consume();
+    }
+
+    @FXML
+    public void onNextShot(ActionEvent event) {
+        if (mainShotIndex != shotAmount - 1) {
+            mainShotIndex++;
+            updatePlot();
+        }
+        event.consume();
+    }
+
+    @FXML
+    private void onGoToShot(ActionEvent event) {
+        int givenIndex = Integer.parseInt(textField_seqNum.getText()) - 1;
+        if (givenIndex != mainShotIndex) {
+            // If the given index is not already loaded
+            if (givenIndex < 0 && mainShotIndex != 0) {
+                // If the given index is before the first and we are not on the first
+                givenIndex = 0;
+            } else if (givenIndex > shotAmount - 1 && mainShotIndex != shotAmount - 1) {
+                // If the given index is after the last and we are not on the last
+                givenIndex = shotAmount - 1;
+            }
+            mainShotIndex = givenIndex;
+            updatePlot();
+        }
+        event.consume();
+    }
+
+    @FXML
+    private void onSetAmountLoadedShots(ActionEvent event) {
+        int givenAmount = Integer.parseInt(textField_amountLoadedShots.getText());
+        if (givenAmount != 0 && givenAmount != amountLoadedShots) {
+            if (givenAmount % 2 != 0) {
+                amountLoadedShots = givenAmount;
+                updatePlot();
+            } else if (givenAmount + 1 != amountLoadedShots) {
+                amountLoadedShots = givenAmount + 1;
+                updatePlot();
+            }
+        }
     }
 
 }

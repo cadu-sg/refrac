@@ -25,25 +25,25 @@
             <MenuItem mnemonicParsing="false" text="Quit" />
           </items>
         </Menu>
-            <Menu disable="true" mnemonicParsing="false" text="Project">
+            <Menu mnemonicParsing="false" text="Project">
                <items>
-                  <MenuItem mnemonicParsing="false" text="New Project..." />
-                  <MenuItem mnemonicParsing="false" text="Open Project..." />
+                  <MenuItem mnemonicParsing="false" onAction="#onNewProject" text="New Project..." />
+                  <MenuItem mnemonicParsing="false" onAction="#onOpenProject" text="Open Project..." />
                   <SeparatorMenuItem mnemonicParsing="false" />
                   <MenuItem mnemonicParsing="false" text="Save" />
                   <MenuItem mnemonicParsing="false" text="Save As..." />
                   <SeparatorMenuItem mnemonicParsing="false" />
-                  <MenuItem mnemonicParsing="false" text="Close" />
+                  <MenuItem mnemonicParsing="false" onAction="#onCloseProject" text="Close" />
                </items>
             </Menu>
-            <Menu mnemonicParsing="false" text="Line">
+            <Menu fx:id="menu_line" disable="true" mnemonicParsing="false" text="Line">
               <items>
-                <MenuItem mnemonicParsing="false" onAction="#newLine" text="New Line..." />
-                  <MenuItem mnemonicParsing="false" onAction="#openLine" text="Open Line..." />
+                <MenuItem mnemonicParsing="false" onAction="#onNewLine" text="New Line..." />
+                  <MenuItem mnemonicParsing="false" onAction="#onOpenLine" text="Open Line..." />
                   <SeparatorMenuItem mnemonicParsing="false" />
                   <MenuItem mnemonicParsing="false" text="Save" />
                   <SeparatorMenuItem mnemonicParsing="false" />
-                  <MenuItem mnemonicParsing="false" text="Close" />
+                  <MenuItem mnemonicParsing="false" onAction="#onCloseLine" text="Close" />
               </items>
             </Menu>
         <Menu mnemonicParsing="false" text="Edit">
@@ -59,32 +59,32 @@
         </Menu>
       </menus>
     </MenuBar>
-      <ToolBar>
+      <ToolBar fx:id="container_toolbar" disable="true">
         <items>
-          <Button mnemonicParsing="false" text="&lt;" />
-            <Button mnemonicParsing="false" text="&gt;" />
+          <Button mnemonicParsing="false" onAction="#onPreviousShot" text="&lt;" />
+            <Button mnemonicParsing="false" onAction="#onNextShot" text="&gt;" />
             <Separator orientation="VERTICAL" />
             <VBox alignment="CENTER">
                <children>
                   <Label text="Seq. number" />
-                  <Label />
+                  <Label fx:id="label_seqNum" />
                </children>
             </VBox>
             <Separator orientation="VERTICAL" />
             <VBox alignment="CENTER">
                <children>
                   <Label text="Source station" />
-                  <Label />
+                  <Label fx:id="label_shotStat" />
                </children>
             </VBox>
             <Separator orientation="VERTICAL" />
             <Label text="Seq. number" />
-            <TextField prefWidth="40.0" />
-            <Button mnemonicParsing="false" text="Go" />
+            <TextField fx:id="textField_seqNum" onAction="#onGoToShot" prefWidth="40.0" />
+            <Button mnemonicParsing="false" onAction="#onGoToShot" text="Go" />
             <Separator orientation="VERTICAL" />
             <Label text="Shots loaded" />
-            <TextField prefWidth="40.0" />
-            <Button mnemonicParsing="false" text="Apply" />
+            <TextField fx:id="textField_amountLoadedShots" onAction="#onSetAmountLoadedShots" prefWidth="40.0" />
+            <Button mnemonicParsing="false" onAction="#onSetAmountLoadedShots" text="Apply" />
             <Separator orientation="VERTICAL" />
             <Button mnemonicParsing="false" text="Z" />
             <Button mnemonicParsing="false" text="E" />
@@ -95,7 +95,7 @@
             <ScrollPane />
             <SplitPane dividerPositions="0.5" orientation="VERTICAL">
                <items>
-                  <StackPane />
+                  <StackPane fx:id="container_pickChart" />
                   <StackPane />
                </items>
             </SplitPane>

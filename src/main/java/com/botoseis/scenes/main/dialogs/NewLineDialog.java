@@ -19,29 +19,33 @@ import java.util.Optional;
 
 public class NewLineDialog extends Dialog<String[]> {
 
-    private final TextField txtField_title;
+    private final TextField txtField_lineTitle;
     private final TextField txtField_picksFile;
     private final FileChooser fileChooser;
+
     private static final Path USER_HOME = Paths.get(System.getProperty("user.home"));
 
     public NewLineDialog() {
+        this(USER_HOME);
+    }
+
+    public NewLineDialog(Path initialDirectory) {
 
         this.fileChooser = new FileChooser();
-
         fileChooser.setTitle("Open Picks File");
-        fileChooser.setInitialDirectory(USER_HOME.toFile());
+        fileChooser.setInitialDirectory(initialDirectory.toFile());
 
         final DialogPane dialogPane = this.getDialogPane();
 
         // Text fields
-        this.txtField_title = new TextField("untitled");
+        this.txtField_lineTitle = new TextField("untitled");
         this.txtField_picksFile = new TextField();
 
         // Labels
-        Label label_lineTitle = new Label("Line Title:");
-        Label label_selectedFile = new Label("Picks location:");
+        Label label_title = new Label("Line Title:");
+        Label label_picksFile = new Label("Picks File:");
 
-        // Choose file button
+        // Buttons
         Button btn_chooseFile = new Button("...");
         btn_chooseFile.setOnAction(this::onChooseFile);
 
@@ -57,13 +61,13 @@ public class NewLineDialog extends Dialog<String[]> {
         dialogPane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
         // Populate grid
-        grid.add(label_lineTitle, 0, 0);
-        grid.add(txtField_title, 1, 0);
-        grid.add(label_selectedFile, 0, 1);
+        grid.add(label_title, 0, 0);
+        grid.add(txtField_lineTitle, 1, 0);
+        grid.add(label_picksFile, 0, 1);
         grid.add(new HBox(txtField_picksFile, btn_chooseFile), 1, 1);
         dialogPane.setContent(grid);
 
-        Platform.runLater(txtField_title::requestFocus);
+        Platform.runLater(txtField_lineTitle::requestFocus);
 
         // Form validation
         Node btn_ok = dialogPane.lookupButton(ButtonType.OK);
@@ -74,7 +78,7 @@ public class NewLineDialog extends Dialog<String[]> {
         this.setResultConverter(dialogButton -> {
             ButtonData data = dialogButton == null ? null : dialogButton.getButtonData();
             return data == ButtonData.OK_DONE
-                    ? new String[]{txtField_title.getText(), txtField_picksFile.getText()}
+                    ? new String[]{txtField_lineTitle.getText(), txtField_picksFile.getText()}
                     : null;
         });
 
@@ -92,14 +96,6 @@ public class NewLineDialog extends Dialog<String[]> {
         Optional.ofNullable(fileChooser.showOpenDialog(this.getOwner())).ifPresent(chosenFile ->
                 txtField_picksFile.setText(chosenFile.toString()));
         event.consume();
-    }
-
-    private boolean isDirAvailable(Path dirPath) {
-        try (DirectoryStream<Path> dirStream = Files.newDirectoryStream(dirPath)) {
-            return !dirStream.iterator().hasNext();
-        } catch (IOException ignored) {
-            return false;
-        }
     }
 
 }

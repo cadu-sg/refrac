@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
@@ -144,16 +145,18 @@ public class PicksTxt {
             }
             shotsPickAmount.add(currentShotPickAmount);
 
-        } catch (IOException e) {
-            throw new IOException("Unable to read picks file", e);
+        } catch (NoSuchFileException e) {
+            throw new IllegalArgumentException("Cannot read picks.dat: no such file", e);
         } catch (NoSuchElementException e) {
-            throw new IllegalArgumentException("Invalid picks file", e);
+            throw new IllegalArgumentException("Cannot read picks.dat: invalid file", e);
+        } catch (IOException e) {
+            throw new IOException("Cannot read picks.dat: an IO exception occurred", e);
         }
 
         shotAmount = shotsPickAmount.size();
         stationAmount = stations.size();
 
-        System.out.println("Total number of picks: " + pickAmount);
+        System.out.println("\nTotal number of picks: " + pickAmount);
         System.out.println("Number of picks at each shot: " + shotsPickAmount);
         System.out.println("Number of shots: " + shotAmount);
         System.out.println("Number of stations: " + stationAmount + '\n');

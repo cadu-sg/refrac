@@ -68,6 +68,8 @@ public class PicksBin {
                     SHOT_SIZE_EXCEPT_PICK_AMOUNT + pickAmount * PICK_SIZE);
             byteChannel.read(shotBuffer);
             return bytesToShot(shotBuffer, pickAmount);
+        } catch (IOException e) {
+            throw new IOException("Cannot load shot: an IO exception occurred", e);
         }
     }
 
