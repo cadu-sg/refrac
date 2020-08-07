@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ColorPicker?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
@@ -10,7 +11,13 @@
 <?import javafx.scene.control.SeparatorMenuItem?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.control.ToolBar?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
@@ -90,9 +97,50 @@
             <Button mnemonicParsing="false" text="E" />
         </items>
       </ToolBar>
-      <SplitPane dividerPositions="0.26" VBox.vgrow="ALWAYS">
+      <SplitPane dividerPositions="0.3" VBox.vgrow="ALWAYS">
          <items>
-            <ScrollPane />
+            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" prefHeight="200.0" prefWidth="200.0">
+               <content>
+                  <VBox>
+                     <children>
+                        <TitledPane text="Layout">
+                           <content>
+                              <GridPane fx:id="container_layout" disable="true">
+                                 <columnConstraints>
+                                    <ColumnConstraints prefWidth="90.0" />
+                                    <ColumnConstraints />
+                                 </columnConstraints>
+                                 <rowConstraints>
+                                    <RowConstraints />
+                                    <RowConstraints />
+                                    <RowConstraints />
+                                    <RowConstraints />
+                                    <RowConstraints />
+                                 </rowConstraints>
+                                 <children>
+                                    <Label text="Toggle" />
+                                    <HBox GridPane.columnIndex="1">
+                                       <children>
+                                          <ToggleButton fx:id="toggleButton_symbols" maxWidth="1.7976931348623157E308" selected="true" text="Symbols" />
+                                          <ToggleButton fx:id="toggleButton_lines" maxWidth="1.7976931348623157E308" text="Line" />
+                                       </children>
+                                    </HBox>
+                                    <Label text="Symbol size" GridPane.rowIndex="1" />
+                                    <TextField fx:id="textField_symbolSize" onAction="#onSetSymbolLayout" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                    <Label text="Line width" GridPane.rowIndex="2" />
+                                    <TextField fx:id="textField_lineWidth" onAction="#onSetLineLayout" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                    <Label text="Symbol color" GridPane.rowIndex="3" />
+                                    <ColorPicker fx:id="colorPicker_symbols" maxWidth="1.7976931348623157E308" onAction="#onSetSymbolLayout" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                                    <Label text="Line color" GridPane.rowIndex="4" />
+                                    <ColorPicker fx:id="colorPicker_lines" maxWidth="1.7976931348623157E308" onAction="#onSetLineLayout" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                                 </children>
+                              </GridPane>
+                           </content>
+                        </TitledPane>
+                     </children>
+                  </VBox>
+               </content>
+            </ScrollPane>
             <SplitPane dividerPositions="0.5" orientation="VERTICAL">
                <items>
                   <StackPane fx:id="container_pickChart" />

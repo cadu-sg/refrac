@@ -13,7 +13,9 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
 
 import java.io.IOException;
@@ -39,12 +41,19 @@ public class MainController {
     private Shot mainShot;
     private List<Shot> loadedShots;
 
+    private String symbolColor = "#000000";
+    private double symbolSize = 0.4;
+    private String lineColor = "#f3622d";
+    private String lineWidth = "2.0";
+
     @FXML
     private Menu menu_line;
     @FXML
     private ToolBar container_toolbar;
     @FXML
     private StackPane container_pickChart;
+    @FXML
+    private GridPane container_layout;
 
     @FXML
     private Label label_seqNum;
@@ -56,6 +65,19 @@ public class MainController {
 
     @FXML
     private TextField textField_amountLoadedShots;
+
+    @FXML
+    private ToggleButton toggleButton_symbols;
+    @FXML
+    private ToggleButton toggleButton_lines;
+    @FXML
+    private TextField textField_symbolSize;
+    @FXML
+    private TextField textField_lineWidth;
+    @FXML
+    private ColorPicker colorPicker_symbols;
+    @FXML
+    private ColorPicker colorPicker_lines;
 
     @FXML
     public void initialize() {
@@ -76,6 +98,15 @@ public class MainController {
             }
         });
         loadedShots = new ArrayList<>();
+
+        toggleButton_symbols.selectedProperty().addListener((observable, oldValue, newValue) -> handleToggleSymbols());
+        toggleButton_lines.selectedProperty().addListener((observable, oldValue, newValue) -> handleToggleLines());
+
+        textField_symbolSize.setText(String.valueOf(symbolSize));
+        textField_lineWidth.setText(lineWidth);
+
+        colorPicker_symbols.setValue(Color.valueOf(symbolColor));
+        colorPicker_lines.setValue(Color.valueOf(lineColor));
     }
 
     private void handleProjectLoaded() {
@@ -107,6 +138,7 @@ public class MainController {
 
     private void toggleLineLoadedContainers(boolean value) {
         container_toolbar.setDisable(!value);
+        container_layout.setDisable(!value);
     }
 
     /**
@@ -118,6 +150,11 @@ public class MainController {
             updateLoadedShots();
 
             plotLoadedShots();
+
+            handleToggleSymbols();
+            handleToggleLines();
+            handleSetSymbolLayout();
+            handleSetLineLayout();
 
         } catch (IOException e) {
             showErrorAlert("Cannot load shots", e.getMessage());
@@ -166,6 +203,54 @@ public class MainController {
         } else {
             pickChart.plot(loadedShots, mainShot);
         }
+    }
+
+    private void handleToggleSymbols() {
+        if (toggleButton_symbols.isSelected()) {
+            pickChart.getLayout().setSymbolsVisible(true);
+            textField_symbolSize.setDisable(false);
+            colorPicker_symbols.setDisable(false);
+        } else {
+            textField_symbolSize.setDisable(true);
+            colorPicker_symbols.setDisable(true);
+            pickChart.getLayout().setSymbolsVisible(false);
+        }
+    }
+
+    private void handleToggleLines() {
+        if (toggleButton_lines.isSelected()) {
+            pickChart.getLayout().setLineVisible(true);
+            textField_lineWidth.setDisable(false);
+
+            colorPicker_lines.setDisable(false);
+        } else {
+            textField_lineWidth.setDisable(true);
+            colorPicker_lines.setDisable(true);
+
+            pickChart.getLayout().setLineVisible(false);
+        }
+    }
+
+    private void handleSetSymbolLayout() {
+        // Update symbolSize
+        if (!textField_symbolSize.getText().isEmpty()) {
+            symbolSize = Double.parseDouble(textField_symbolSize.getText());
+        }
+        // Update symbolColor
+        symbolColor = colorPicker_symbols.getValue().toString().replaceAll("0x", "#");
+        // Set updated symbol layout
+        pickChart.getLayout().setSymbolsStyle(symbolColor, "o", symbolSize);
+    }
+
+    private void handleSetLineLayout() {
+        // Update lineWidth
+        if (!textField_lineWidth.getText().isEmpty()) {
+            lineWidth = textField_lineWidth.getText();
+        }
+        // Update lineColor
+        lineColor = colorPicker_lines.getValue().toString().replaceAll("0x", "#");
+        // Set updated line layout
+        pickChart.getLayout().setLineStyle(lineWidth, lineColor);
     }
 
     private void showErrorAlert(String headerText, String contentText) {
@@ -337,6 +422,19 @@ public class MainController {
                 updatePlot();
             }
         }
+        event.consume();
+    }
+
+    @FXML
+    private void onSetSymbolLayout(ActionEvent event) {
+        handleSetSymbolLayout();
+        event.consume();
+    }
+
+    @FXML
+    private void onSetLineLayout(ActionEvent event) {
+        handleSetLineLayout();
+        event.consume();
     }
 
 }
