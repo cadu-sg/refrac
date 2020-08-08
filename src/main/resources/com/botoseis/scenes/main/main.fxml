@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ColorPicker?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.RadioButton?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SeparatorMenuItem?>
@@ -93,8 +95,8 @@
             <TextField fx:id="textField_amountLoadedShots" onAction="#onSetAmountLoadedShots" prefWidth="40.0" />
             <Button mnemonicParsing="false" onAction="#onSetAmountLoadedShots" text="Apply" />
             <Separator orientation="VERTICAL" />
-            <Button mnemonicParsing="false" text="Z" />
-            <Button mnemonicParsing="false" text="E" />
+            <ToggleButton fx:id="toggleButton_zoom" mnemonicParsing="false" text="Z" />
+            <ToggleButton fx:id="toggleButton_eraser" mnemonicParsing="false" text="E" />
         </items>
       </ToolBar>
       <SplitPane dividerPositions="0.3" VBox.vgrow="ALWAYS">
@@ -133,6 +135,52 @@
                                     <ColorPicker fx:id="colorPicker_symbols" maxWidth="1.7976931348623157E308" onAction="#onSetSymbolLayout" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
                                     <Label text="Line color" GridPane.rowIndex="4" />
                                     <ColorPicker fx:id="colorPicker_lines" maxWidth="1.7976931348623157E308" onAction="#onSetLineLayout" prefWidth="120.0" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                                 </children>
+                              </GridPane>
+                           </content>
+                        </TitledPane>
+                        <TitledPane prefHeight="200.0" prefWidth="200.0" text="Interpretation">
+                           <content>
+                              <GridPane fx:id="container_interpretation" disable="true">
+                                 <columnConstraints>
+                                    <ColumnConstraints />
+                                    <ColumnConstraints halignment="CENTER" minWidth="30.0" />
+                                    <ColumnConstraints halignment="CENTER" minWidth="30.0" />
+                                 </columnConstraints>
+                                 <rowConstraints>
+                                    <RowConstraints minHeight="20.0" />
+                                    <RowConstraints minHeight="30.0" />
+                                    <RowConstraints minHeight="30.0" />
+                                    <RowConstraints minHeight="30.0" />
+                                    <RowConstraints minHeight="30.0" />
+                                 </rowConstraints>
+                                 <children>
+                                    <Label text="Wave / Side" />
+                                    <Label text="Direct" GridPane.rowIndex="1" />
+                                    <Label text="Refracted 1" GridPane.rowIndex="2" />
+                                    <Label text="Refracted 2" GridPane.rowIndex="3" />
+                                    <Label text="Refracted 3" GridPane.rowIndex="4" />
+                                    <Label text="Left" GridPane.columnIndex="1" />
+                                    <Label text="Right" GridPane.columnIndex="2" />
+                                    <RadioButton fx:id="radbtn_directL" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                    <RadioButton fx:id="radbtn_refraction1L" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                    <RadioButton fx:id="radbtn_refraction2L" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                                    <RadioButton fx:id="radbtn_refraction3L" mnemonicParsing="false" GridPane.columnIndex="1" GridPane.rowIndex="4">
+                                       <GridPane.margin>
+                                          <Insets />
+                                       </GridPane.margin>
+                                       <padding>
+                                          <Insets right="-6.0" />
+                                       </padding>
+                                    </RadioButton>
+                                    <RadioButton fx:id="radbtn_directR" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                                    <RadioButton fx:id="radbtn_refraction1R" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+                                    <RadioButton fx:id="radbtn_refraction2R" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+                                    <RadioButton fx:id="radbtn_refraction3R" mnemonicParsing="false" GridPane.columnIndex="2" GridPane.rowIndex="4">
+                                       <padding>
+                                          <Insets right="-6.0" />
+                                       </padding>
+                                    </RadioButton>
                                  </children>
                               </GridPane>
                            </content>

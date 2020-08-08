@@ -1,9 +1,17 @@
 package com.botoseis.chart;
 
+import com.botoseis.chart.utils.Eraser;
 import com.botoseis.chart.utils.SeriesLayout;
+import com.botoseis.chart.utils.Zoom;
+import com.botoseis.chart.utils.linedrawer.LineDrawer;
+import com.botoseis.chart.utils.linedrawer.OriginFixedLineDrawer;
+import com.botoseis.chart.utils.linedrawer.StandardLineDrawer;
+import com.botoseis.chart.utils.linedrawer.VelocitiesLegend;
 import com.botoseis.chart.utils.marker.LineChartWithMarkers;
 import com.botoseis.structs.Pick;
 import com.botoseis.structs.Shot;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.DoubleProperty;
 import javafx.collections.ObservableList;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
@@ -21,8 +29,35 @@ public final class PickChart {
     private final XYChart.Series<Number, Number> series;
     private final ObservableList<XYChart.Data<Number, Number>> pickDataList;
     private final List<Shot> loadedShots;
-    private final SeriesLayout seriesLayout;
     private Shot mainShot;
+
+    private final SeriesLayout seriesLayout;
+    private final Zoom zoom;
+    private final Eraser eraser;
+
+    private final LineDrawer drawer_head3L;
+    private final LineDrawer drawer_head2L;
+    private final LineDrawer drawer_head1L;
+    private final LineDrawer drawer_directL;
+    private final LineDrawer drawer_directR;
+    private final LineDrawer drawer_head1R;
+    private final LineDrawer drawer_head2R;
+    private final LineDrawer drawer_head3R;
+
+    private final DoubleProperty slope_head3L;
+    private final DoubleProperty slope_head2L;
+    private final DoubleProperty slope_head1L;
+    private final DoubleProperty slope_directL;
+    private final DoubleProperty slope_directR;
+    private final DoubleProperty slope_head1R;
+    private final DoubleProperty slope_head2R;
+    private final DoubleProperty slope_head3R;
+    private final DoubleProperty intercept_head3L;
+    private final DoubleProperty intercept_head2L;
+    private final DoubleProperty intercept_head1L;
+    private final DoubleProperty intercept_head1R;
+    private final DoubleProperty intercept_head2R;
+    private final DoubleProperty intercept_head3R;
 
     public PickChart(StackPane chartPane) {
         this.loadedShots = new ArrayList<>();
@@ -43,10 +78,53 @@ public final class PickChart {
         chart.setLegendVisible(false);
         chart.getData().add(series);
 
-        // Styling
-        seriesLayout = new SeriesLayout(series);
-
         chartPane.getChildren().add(chart);
+
+        // Styling
+
+        this.seriesLayout = new SeriesLayout(series);
+        // Zoom
+        this.zoom = new Zoom(chart, chartPane);
+
+        // Eraser
+        this.eraser = new Eraser(chart, chartPane, pickDataList);
+
+        // Line drawers
+        drawer_head3L = new StandardLineDrawer(chart, chartPane, "Head 3 Left", "magenta", 's');
+        drawer_head2L = new StandardLineDrawer(chart, chartPane, "Head 2 Left", "green", 'o');
+        drawer_head1L = new StandardLineDrawer(chart, chartPane, "Head 1 Left", "red", 'D');
+        drawer_directL = new OriginFixedLineDrawer(chart, chartPane, "Direct Left", "blue", 's');
+        drawer_directR = new OriginFixedLineDrawer(chart, chartPane, "Direct Right", "blue", 's');
+        drawer_head1R = new StandardLineDrawer(chart, chartPane, "Head 1 Right", "red", 'D');
+        drawer_head2R = new StandardLineDrawer(chart, chartPane, "Head 2 Right", "green", 'o');
+        drawer_head3R = new StandardLineDrawer(chart, chartPane, "Head 3 Right", "magenta", 's');
+        slope_head3L = drawer_head3L.slopeProperty();
+        slope_head2L = drawer_head2L.slopeProperty();
+        slope_head1L = drawer_head1L.slopeProperty();
+        slope_directL = drawer_directL.slopeProperty();
+        slope_directR = drawer_directR.slopeProperty();
+        slope_head1R = drawer_head1R.slopeProperty();
+        slope_head2R = drawer_head2R.slopeProperty();
+        slope_head3R = drawer_head3R.slopeProperty();
+        intercept_head3L = drawer_head3L.interceptProperty();
+        intercept_head2L = drawer_head2L.interceptProperty();
+        intercept_head1L = drawer_head1L.interceptProperty();
+        intercept_head1R = drawer_head1R.interceptProperty();
+        intercept_head2R = drawer_head2R.interceptProperty();
+        intercept_head3R = drawer_head3R.interceptProperty();
+
+        // Velocities legend
+        VelocitiesLegend velocitiesLegend = new VelocitiesLegend(
+                chartPane,
+                slope_head3L,
+                slope_head2L,
+                slope_head1L,
+                slope_directL,
+                slope_directR,
+                slope_head1R,
+                slope_head2R,
+                slope_head3R
+        );
     }
 
     public void plot(Shot shot) {
@@ -82,17 +160,41 @@ public final class PickChart {
         return seriesLayout;
     }
 
-    public void setSymbolsVisible(boolean value) {
-        seriesLayout.setSymbolsVisible(value);
+    public void assignToolsControllers(
+            BooleanProperty toggle_zoom, BooleanProperty toggle_eraser,
+            BooleanProperty toggle_head3L, BooleanProperty toggle_head2L, BooleanProperty toggle_head1L, BooleanProperty toggle_directL,
+            BooleanProperty toggle_directR, BooleanProperty toggle_head1R, BooleanProperty toggle_head2R, BooleanProperty toggle_head3R) {
+
+        zoom.enabledProperty().bind(toggle_zoom);
+        eraser.enabledProperty().bind(toggle_eraser);
+
+        drawer_head3L.enabledProperty().bind(toggle_head3L);
+        drawer_head2L.enabledProperty().bind(toggle_head2L);
+        drawer_head1L.enabledProperty().bind(toggle_head1L);
+        drawer_directL.enabledProperty().bind(toggle_directL);
+        drawer_directR.enabledProperty().bind(toggle_directR);
+        drawer_head1R.enabledProperty().bind(toggle_head1R);
+        drawer_head2R.enabledProperty().bind(toggle_head2R);
+        drawer_head3R.enabledProperty().bind(toggle_head3R);
+
+        ensureSingleTrue(toggle_zoom, toggle_eraser,
+                toggle_head3L, toggle_head2L, toggle_head1L, toggle_directL,
+                toggle_directR, toggle_head1R, toggle_head2R, toggle_head3R);
     }
 
-
-    public void setSymbolStyle(String color, String shape, double size) {
-        seriesLayout.setSymbolsStyle(color, shape, size);
-    }
-
-    public void setLineStyle(String width, String color) {
-        seriesLayout.setLineStyle(width, color);
+    private void ensureSingleTrue(BooleanProperty... booleanProperties) {
+        for (int i = 0; i < booleanProperties.length; i++) {
+            final int currentIndex = i;
+            booleanProperties[i].addListener((obs, oldValue, isNowSelected) -> {
+                if (isNowSelected) {
+                    for (int j = 0; j < booleanProperties.length; j++) {
+                        if (j != currentIndex) {
+                            booleanProperties[j].set(false);
+                        }
+                    }
+                }
+            });
+        }
     }
 
     /**

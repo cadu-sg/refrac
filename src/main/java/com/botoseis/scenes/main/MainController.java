@@ -15,6 +15,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
 
@@ -80,6 +81,30 @@ public class MainController {
     private ColorPicker colorPicker_lines;
 
     @FXML
+    private ToggleButton toggleButton_zoom;
+    @FXML
+    private ToggleButton toggleButton_eraser;
+
+    @FXML
+    private GridPane container_interpretation;
+    @FXML
+    private RadioButton radbtn_refraction3L;
+    @FXML
+    private RadioButton radbtn_refraction2L;
+    @FXML
+    private RadioButton radbtn_refraction1L;
+    @FXML
+    private RadioButton radbtn_directL;
+    @FXML
+    private RadioButton radbtn_directR;
+    @FXML
+    private RadioButton radbtn_refraction1R;
+    @FXML
+    private RadioButton radbtn_refraction2R;
+    @FXML
+    private RadioButton radbtn_refraction3R;
+
+    @FXML
     public void initialize() {
         projectLoaded = new SimpleBooleanProperty(false);
         projectLoaded.addListener((observable, oldValue, newValue) -> {
@@ -116,13 +141,23 @@ public class MainController {
     private void handleProjectUnloaded() {
         menu_line.setDisable(true);
         lineLoaded.set(false);
-        project = null;
     }
 
     private void handleLineLoaded() {
         toggleLineLoadedContainers(true);
 
         pickChart = new PickChart(container_pickChart);
+        pickChart.assignToolsControllers(
+                toggleButton_zoom.selectedProperty(), toggleButton_eraser.selectedProperty(),
+                radbtn_refraction3L.selectedProperty(),
+                radbtn_refraction2L.selectedProperty(),
+                radbtn_refraction1L.selectedProperty(),
+                radbtn_directL.selectedProperty(),
+                radbtn_directR.selectedProperty(),
+                radbtn_refraction1R.selectedProperty(),
+                radbtn_refraction2R.selectedProperty(),
+                radbtn_refraction3R.selectedProperty());
+
         shotAmount = line.getShotAmount();
         mainShotIndex = 0;
         amountLoadedShots = 1;
@@ -132,6 +167,18 @@ public class MainController {
     private void handleLineUnloaded() {
         toggleLineLoadedContainers(false);
 
+        label_seqNum.setText("");
+        label_shotStat.setText("");
+
+        radbtn_refraction3L.setSelected(false);
+        radbtn_refraction2L.setSelected(false);
+        radbtn_refraction1L.setSelected(false);
+        radbtn_directL.setSelected(false);
+        radbtn_directR.setSelected(false);
+        radbtn_refraction1R.setSelected(false);
+        radbtn_refraction2R.setSelected(false);
+        radbtn_refraction3R.setSelected(false);
+
         container_pickChart.getChildren().clear();
         pickChart = null;
     }
@@ -139,6 +186,7 @@ public class MainController {
     private void toggleLineLoadedContainers(boolean value) {
         container_toolbar.setDisable(!value);
         container_layout.setDisable(!value);
+        container_interpretation.setDisable(!value);
     }
 
     /**

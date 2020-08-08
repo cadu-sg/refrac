@@ -68,11 +68,11 @@ public class SeriesLayout {
 
             setSymbolsStyle(symbolColor, symbolShape, symbolSize);
 
-        } else if (symbolShape != null && symbolSize == null) {
+        } else if (symbolShape != null) {
 
             setSymbolsColorShape(symbolColor, symbolShape);
 
-        } else if (symbolShape == null && symbolSize != null) {
+        } else if (symbolSize != null) {
 
             setSymbolsColorSize(symbolColor, symbolSize);
 
@@ -92,11 +92,11 @@ public class SeriesLayout {
 
             setSymbolsStyle(symbolColor, symbolShape, symbolSize);
 
-        } else if (symbolColor != null && symbolSize == null) {
+        } else if (symbolColor != null) {
 
             setSymbolsColorShape(symbolColor, symbolShape);
 
-        } else if (symbolColor == null && symbolSize != null) {
+        } else if (symbolSize != null) {
 
             setSymbolsShapeSize(symbolShape, symbolSize);
 
