@@ -15,7 +15,6 @@ import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
 
@@ -269,12 +268,10 @@ public class MainController {
         if (toggleButton_lines.isSelected()) {
             pickChart.getLayout().setLineVisible(true);
             textField_lineWidth.setDisable(false);
-
             colorPicker_lines.setDisable(false);
         } else {
             textField_lineWidth.setDisable(true);
             colorPicker_lines.setDisable(true);
-
             pickChart.getLayout().setLineVisible(false);
         }
     }

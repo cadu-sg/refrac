@@ -9,5 +9,8 @@
         <module name="Refrac" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="Refrac" target="11" />
+    </bytecodeTargetLevel>
   </component>
 </project>

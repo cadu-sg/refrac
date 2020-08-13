@@ -15,8 +15,8 @@ public final class StandardLineDrawer extends LineDrawer {
     private Double minDrawInterceptValue;
     private Double maxDrawInterceptValue;
 
-    public StandardLineDrawer(XYChart<Number, Number> chart, Pane chartPane, String seriesName, String color, char shape) {
-        super(chart, chartPane, seriesName, color, shape);
+    public StandardLineDrawer(XYChart<Number, Number> chart, Pane chartPane, String color, char shape) {
+        super(chart, chartPane, color, shape);
 
         // Eventos do mouse
         this.mousePressedHandler = new StandardMousePressedHandler();
@@ -59,7 +59,7 @@ public final class StandardLineDrawer extends LineDrawer {
     }
 
     @Override
-    protected void onDrawedHandler() {
+    protected void onDrawnHandler() {
         updateCoefficients();
         double interceptValue = intercept.get();
 
@@ -114,7 +114,7 @@ public final class StandardLineDrawer extends LineDrawer {
                 // Menos de um dois pontos, logo serão criados no máximo dois pontos
 
                 // Obter ponto em relação ao gráfico
-                Point2D dataPoint = eventToDataCoordinates(event);
+                Point2D dataPoint = mouseEventToDataValues(event);
                 XYChart.Data<Number, Number> data = new XYChart.Data<>(dataPoint.getX(), dataPoint.getY());
 
                 // Desenhar ponto no gráfico
@@ -133,7 +133,7 @@ public final class StandardLineDrawer extends LineDrawer {
                     setPoint2(data);
                     disablePreviewLine();
                     chartPane.setCursor(Cursor.DEFAULT);
-                    drawed.set(true);
+                    drawn.set(true);
                 }
 
             } else if (event.isSecondaryButtonDown() && !lineData.isEmpty()) {
@@ -141,7 +141,7 @@ public final class StandardLineDrawer extends LineDrawer {
                 // Há pelo menos um ponto
 
                 // Se o clique do mouse está mais perto do data1, ele quem será o data2 (que será apagado)
-                double eventX = eventToDataCoordinates(event).getX();
+                double eventX = mouseEventToDataValues(event).getX();
                 if (data2 != null) {
                     if (Math.abs(eventX - data1.getXValue().doubleValue()) < Math.abs(eventX - data2.getXValue().doubleValue())) {
                         XYChart.Data<Number, Number> swapData = data1;
@@ -157,7 +157,7 @@ public final class StandardLineDrawer extends LineDrawer {
                     chartPane.setCursor(Cursor.CROSSHAIR);
                     enablePreviewLine(data1);
                     previewLine.setEnd(event.getX(), event.getY());
-                    drawed.set(false);
+                    drawn.set(false);
                 } else {
                     lineData.remove(data1);
                     data1 = null;
@@ -180,20 +180,20 @@ public final class StandardLineDrawer extends LineDrawer {
                     data1 = data2;
                     data2 = data;
                 }
-                drawed.set(false);
+                drawn.set(false);
             }
             event.consume();
         });
         dataNode.setOnMouseDragged((MouseEvent event) -> {
             if (event.isMiddleButtonDown()) {
-                Point2D newDataPoint = eventToDataCoordinates(event);
+                Point2D newDataPoint = mouseEventToDataValues(event);
                 data.setXValue(newDataPoint.getX());
                 data.setYValue(newDataPoint.getY());
             }
             event.consume();
         });
         dataNode.setOnMouseReleased((MouseEvent event) -> {
-            drawed.set(true);
+            drawn.set(true);
             event.consume();
         });
     }

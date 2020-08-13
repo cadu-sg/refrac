@@ -36,14 +36,6 @@ public abstract class LineDrawer {
     protected MouseMovedHandler mouseMovedHandler;
     protected FixLineStart fixPreviewLineStart;
 
-    protected final BooleanProperty drawed;
-    protected final BooleanProperty enabled;
-
-    protected final SimpleDoubleProperty slope;
-    protected final SimpleDoubleProperty intercept;
-
-    protected final String name;
-
     protected XYChart.Data<Number, Number> data1;
     protected XYChart.Data<Number, Number> data2;
 
@@ -51,31 +43,73 @@ public abstract class LineDrawer {
     protected final String color;
     protected final char shape;
 
-    // OBS: Primeiro adicionar o chart ao chartPane, DEPOIS gerar esse objeto
-    public LineDrawer(XYChart<Number, Number> chart, Pane chartPane, String name, String color, char shape) {
+    protected final SimpleDoubleProperty slope;
+    protected final SimpleDoubleProperty intercept;
 
-        // Nome do desenhador de linha
-        this.name = name;
+    protected final BooleanProperty drawn;
+    protected final BooleanProperty enabled;
 
-        // Linha desenhada
-        XYChart.Series<Number, Number> lineSeries = new XYChart.Series<>();  // series of the two points of the line
-        lineSeries.setName(this.name);
+    public final SimpleDoubleProperty slopeProperty() {
+        return this.slope;
+    }
+
+    public final double getSlope() {
+        return this.slope.get();
+    }
+
+    public final SimpleDoubleProperty interceptProperty() {
+        return this.intercept;
+    }
+
+    public final double getIntercept() {
+        return this.intercept.get();
+    }
+
+    public final BooleanProperty enabledProperty() {
+        return this.enabled;
+    }
+
+    public final boolean isEnabled() {
+        return this.enabled.get();
+    }
+
+    public final void setEnabled(boolean value) {
+        this.enabled.set(value);
+    }
+
+    public final BooleanProperty drawnProperty() {
+        return this.drawn;
+    }
+
+    public final boolean isDrawn() {
+        return this.drawn.get();
+    }
+
+    public LineDrawer(XYChart<Number, Number> chart, Pane chartPane, String color, char shape) {
+
+        // Obs.: We first need to add the chart to the window before instantiating this object
+
+        // Series for line drawings
+        XYChart.Series<Number, Number> lineSeries = new XYChart.Series<>();
         this.lineData = lineSeries.getData();
 
-        // Gráfico e seus eixos
-        this.chartPane = chartPane;
+        // Chart
         this.chart = chart;
+        this.chartPane = chartPane;
+
+        // Axes
         this.xAxis = (NumberAxis) chart.getXAxis();
         this.yAxis = (NumberAxis) chart.getYAxis();
+
         this.chart.getData().add(lineSeries);
 
-        // Layout da linha
+        // Series layout
         this.seriesLayout = new SeriesLayout(lineSeries);
         this.color = color;
         this.shape = shape;
         this.seriesLayout.setLineColor(color);
 
-        // Linha de prévia
+        // Preview line
         this.previewLine = new PreviewLine();
         chartPane.getChildren().add(this.previewLine);
         this.fixPreviewLineStart = new FixLineStart(this.previewLine, (Stage) chart.getScene().getWindow());
@@ -83,12 +117,12 @@ public abstract class LineDrawer {
         // Properties
         this.slope = new SimpleDoubleProperty(UNDEFINED);
         this.intercept = new SimpleDoubleProperty(UNDEFINED);
-        this.drawed = new SimpleBooleanProperty(false);
+        this.drawn = new SimpleBooleanProperty(false);
         this.enabled = new SimpleBooleanProperty(false);
 
-        this.drawed.addListener((observable, oldValue, newValue) -> {
+        this.drawn.addListener((observable, oldValue, newValue) -> {
             if (newValue) {
-                onDrawedHandler();
+                onDrawnHandler();
             } else {
                 onErasedHandler();
             }
@@ -104,37 +138,17 @@ public abstract class LineDrawer {
 
     }
 
-    public String getName() {
-        return this.name;
-    }
-
-    public final BooleanProperty enabledProperty() {
-        return this.enabled;
-    }
-
-    public final boolean isEnabled() {
-        return this.enabled.get();
-    }
-
-    public final void setEnabled(boolean value) {
-        this.enabledProperty().set(value);
-    }
-
     protected abstract void onEnabledHandler();
 
     protected abstract void onDisabledHandler();
 
-    protected void onDrawedHandler() {
+    protected void onDrawnHandler() {
         updateCoefficients();
     }
 
     protected void onErasedHandler() {
         slope.set(UNDEFINED);
         intercept.set(UNDEFINED);
-    }
-
-    public final boolean isDrawed() {
-        return this.drawed.get();
     }
 
     protected final void updateCoefficients() {
@@ -144,26 +158,6 @@ public abstract class LineDrawer {
         double y2 = data2.getYValue().doubleValue();
         slope.set((y2 - y1) / (x2 - x1));
         intercept.set(y1 - slope.get() * x1);
-    }
-
-    public final double getSlope() {
-        return this.slope.get();
-    }
-
-    public final double getIntercept() {
-        return this.intercept.get();
-    }
-
-    public final BooleanProperty drawedProperty() {
-        return this.drawed;
-    }
-
-    public final SimpleDoubleProperty slopeProperty() {
-        return this.slope;
-    }
-
-    public final SimpleDoubleProperty interceptProperty() {
-        return this.intercept;
     }
 
     public final ObservableList<XYChart.Data<Number, Number>> getData() {
@@ -234,21 +228,33 @@ public abstract class LineDrawer {
         return this.chartPane;
     }
 
+
     /* Dada uma coordenada nos eixos do gráfico
        obter suas cooordenadas em relação ao chartPane */
-    protected final Point2D dataToPaneCoordinates(double x, double y) {
+
+    /**
+     * Given the data values, obtain the equivalent relative to the chartPane coordinate space
+     *
+     * @param x x value relative to the plot
+     * @param y y value relative to the plot
+     * @return coordinate values relative to the chartPane coordinate space
+     */
+    protected final Point2D dataValuesToChartPaneCoordinates(double x, double y) {
         // ---------------------------------------------------------------------
         // NumberAxis.getDisplayPosition()
         // return double
-        // Obtém a posição de exibição na tela ao longo desse eixo para dado valor
+        // Gets the display position along the axis for a given value. The given position is relative
+        // to the axis node
         // ---------------------------------------------------------------------
         // NumberAxis.localToScene()
         // return Point2D
-        // Transforma um ponto do espaço de coordenadas desse Node para o espaço de coordenadas da Scene
+        // Transforms a point from the local coordinate of the current Node into the coordinate space
+        // of its Scene
         // ---------------------------------------------------------------------
         // Pane.sceneToLocal()
         // return Point2D
-        // Transforma um ponto do espaço de coordenadas da Scene para o espaço de coordenadas desse Node
+        // Transform a point from the coordinate space of the Scene into the local coordinate space of
+        // this Node (chartPane).
 
         Point2D pointRelativeToAxes = new Point2D(
                 xAxis.getDisplayPosition(x),
@@ -264,30 +270,34 @@ public abstract class LineDrawer {
 
     /* Dado um evento do mouse na cena
        obter suas coordenadas em relação aos eixos dos gráfico */
-    protected final Point2D eventToDataCoordinates(MouseEvent event) {
-        // MouseEvent.getX() e MouseEvent.getY()
-        // return double
-        // Posição horizontal/vertical do event, relativa à origem do Node que é a fonte do MouseEvent
-        // no caso o Node do mouseEvent é o chart
+
+    /**
+     * Given a MouseEvent, obtain its coordinate values relative to the plot (data value)
+     *
+     * @param event mouse event
+     * @return data values
+     */
+    protected final Point2D mouseEventToDataValues(MouseEvent event) {
         // -----------------------------------------------------------------
-        // MouseEvent.getSceneX() e MouseEvent.getSceneY()
-        // return Point2D
-        // Posição horizontal/vertical do evento, relativa à origem da Scene que contém a fonte do MouseEvent
+        // MouseEvent.getSceneX() and MouseEvent.getSceneY()
+        // return double
+        // Horizontal/vertical position of the event relative to the origin of the Scene that contains the MouseEvent's
+        // source.
         // -----------------------------------------------------------------
         // Node.sceneToLocal(Point2D scenePoint)
         // return Point2D
-        // Transforma um ponto do espaço de coordenadas da cena para o espaço de coordenadas desse Node
+        // Transforms a point from the coordinate space of the scene into the local coordinate space of this Node, which
+        // is the axis.
         // -----------------------------------------------------------------
         // NumberAxis.getValueForDisplay(double displayPosition)
         // return Number
-        // Obtém o valor do dado para dada posição de exibição no eixo
+        // Gets the data value for the given display position on this axis.
         Point2D pointRelativeToScene = new Point2D(event.getSceneX(), event.getSceneY());
 
         return new Point2D(
                 xAxis.getValueForDisplay(xAxis.sceneToLocal(pointRelativeToScene).getX()).doubleValue(),
                 yAxis.getValueForDisplay(yAxis.sceneToLocal(pointRelativeToScene).getY()).doubleValue());
     }
-
 
     protected abstract class MousePressedHandler implements EventHandler<MouseEvent> {
 
@@ -296,22 +306,22 @@ public abstract class LineDrawer {
     protected abstract void enableDataMouseDragging(XYChart.Data<Number, Number> data);
 
     protected void enablePreviewLine(XYChart.Data<Number, Number> lineStartData) {
-        // Ativar previewLine
+        // Enable preview line
         previewLine.setVisible(true);
         chartPane.addEventHandler(MouseEvent.MOUSE_MOVED, mouseMovedHandler);
 
-        // Ativar correção da previewLine ao redimensionar o gráfico
+        // Enable preview line correction when resizing the chart
         fixPreviewLineStart.enable(
                 lineStartData.getXValue().doubleValue(),
                 lineStartData.getYValue().doubleValue());
     }
 
     protected void disablePreviewLine() {
-        // Desativar previewLine
+        // Disable previewLine
         previewLine.setVisible(false);
         chartPane.removeEventHandler(MouseEvent.MOUSE_MOVED, mouseMovedHandler);
 
-        // Desativar correção da previewLine
+        // Disable preview line correction when resizing the chart
         fixPreviewLineStart.disable();
     }
 
@@ -363,7 +373,7 @@ public abstract class LineDrawer {
                         // System.out.println("Waiting for change in size");
                         Point2D size = dimensionChangeQueue.take();
                         // System.out.printf("Detected change in size to [%.1f, %.1f]: processing\n", size.getX(), size.getY());
-                        line.setStart(dataToPaneCoordinates(x, y));
+                        line.setStart(dataValuesToChartPaneCoordinates(x, y));
                         // System.out.println("Done processing");
                     }
                 } catch (InterruptedException ignored) {
@@ -375,7 +385,7 @@ public abstract class LineDrawer {
         public void enable(double x, double y) {
             this.x = x;
             this.y = y;
-            this.line.setStart(dataToPaneCoordinates(x, y));
+            this.line.setStart(dataValuesToChartPaneCoordinates(x, y));
 
             this.stage.widthProperty().addListener(dimensionChangeListener);
             this.stage.heightProperty().addListener(dimensionChangeListener);

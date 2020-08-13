@@ -3,11 +3,9 @@ package com.botoseis.chart;
 import com.botoseis.chart.utils.Eraser;
 import com.botoseis.chart.utils.SeriesLayout;
 import com.botoseis.chart.utils.Zoom;
-import com.botoseis.chart.utils.linedrawer.LineDrawer;
-import com.botoseis.chart.utils.linedrawer.OriginFixedLineDrawer;
-import com.botoseis.chart.utils.linedrawer.StandardLineDrawer;
-import com.botoseis.chart.utils.linedrawer.VelocitiesLegend;
+import com.botoseis.chart.utils.linedrawer.*;
 import com.botoseis.chart.utils.marker.LineChartWithMarkers;
+import com.botoseis.chart.utils.marker.VerticalMarkerGenerator;
 import com.botoseis.structs.Pick;
 import com.botoseis.structs.Shot;
 import javafx.beans.property.BooleanProperty;
@@ -59,6 +57,13 @@ public final class PickChart {
     private final DoubleProperty intercept_head2R;
     private final DoubleProperty intercept_head3R;
 
+    private final IntersectionDetector intersection_head3L_head2L;
+    private final IntersectionDetector intersection_head2L_head1L;
+    private final IntersectionDetector intersection_head1L_directL;
+    private final IntersectionDetector intersection_directR_head1R;
+    private final IntersectionDetector intersection_head1R_head2R;
+    private final IntersectionDetector intersection_head2R_head3R;
+
     public PickChart(StackPane chartPane) {
         this.loadedShots = new ArrayList<>();
 
@@ -90,14 +95,14 @@ public final class PickChart {
         this.eraser = new Eraser(chart, chartPane, pickDataList);
 
         // Line drawers
-        drawer_head3L = new StandardLineDrawer(chart, chartPane, "Head 3 Left", "magenta", 's');
-        drawer_head2L = new StandardLineDrawer(chart, chartPane, "Head 2 Left", "green", 'o');
-        drawer_head1L = new StandardLineDrawer(chart, chartPane, "Head 1 Left", "red", 'D');
-        drawer_directL = new OriginFixedLineDrawer(chart, chartPane, "Direct Left", "blue", 's');
-        drawer_directR = new OriginFixedLineDrawer(chart, chartPane, "Direct Right", "blue", 's');
-        drawer_head1R = new StandardLineDrawer(chart, chartPane, "Head 1 Right", "red", 'D');
-        drawer_head2R = new StandardLineDrawer(chart, chartPane, "Head 2 Right", "green", 'o');
-        drawer_head3R = new StandardLineDrawer(chart, chartPane, "Head 3 Right", "magenta", 's');
+        drawer_head3L = new StandardLineDrawer(chart, chartPane, "magenta", 's');
+        drawer_head2L = new StandardLineDrawer(chart, chartPane, "green", 'o');
+        drawer_head1L = new StandardLineDrawer(chart, chartPane, "red", 'D');
+        drawer_directL = new OriginFixedLineDrawer(chart, chartPane, "blue", 's');
+        drawer_directR = new OriginFixedLineDrawer(chart, chartPane, "blue", 's');
+        drawer_head1R = new StandardLineDrawer(chart, chartPane, "red", 'D');
+        drawer_head2R = new StandardLineDrawer(chart, chartPane, "green", 'o');
+        drawer_head3R = new StandardLineDrawer(chart, chartPane, "magenta", 's');
         slope_head3L = drawer_head3L.slopeProperty();
         slope_head2L = drawer_head2L.slopeProperty();
         slope_head1L = drawer_head1L.slopeProperty();
@@ -125,6 +130,21 @@ public final class PickChart {
                 slope_head2R,
                 slope_head3R
         );
+
+        intersection_head3L_head2L = new IntersectionDetector(drawer_head3L, drawer_head2L);
+        intersection_head2L_head1L = new IntersectionDetector(drawer_head2L, drawer_head1L);
+        intersection_head1L_directL = new IntersectionDetector(drawer_head1L, drawer_directL);
+        intersection_directR_head1R = new IntersectionDetector(drawer_directR, drawer_head1R);
+        intersection_head1R_head2R = new IntersectionDetector(drawer_head1R, drawer_head2R);
+        intersection_head2R_head3R = new IntersectionDetector(drawer_head2R, drawer_head3R);
+
+        VerticalMarkerGenerator marker_head3L_head2L = new VerticalMarkerGenerator(chart, intersection_head3L_head2L);
+        VerticalMarkerGenerator marker_head2L_head1L = new VerticalMarkerGenerator(chart, intersection_head2L_head1L);
+        VerticalMarkerGenerator marker_head1L_directL = new VerticalMarkerGenerator(chart, intersection_head1L_directL);
+        VerticalMarkerGenerator marker_directR_head1R = new VerticalMarkerGenerator(chart, intersection_directR_head1R);
+        VerticalMarkerGenerator marker_head1R_head2R = new VerticalMarkerGenerator(chart, intersection_head1R_head2R);
+        VerticalMarkerGenerator marker_head2R_head3R = new VerticalMarkerGenerator(chart, intersection_head2R_head3R);
+
     }
 
     public void plot(Shot shot) {
