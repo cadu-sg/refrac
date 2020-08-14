@@ -63,10 +63,10 @@ public final class StandardLineDrawer extends LineDrawer {
         updateCoefficients();
         double interceptValue = intercept.get();
 
-        if (minDrawInterceptValue == null ? false : interceptValue < minDrawInterceptValue) {
+        if (minDrawInterceptValue != null && interceptValue < minDrawInterceptValue) {
             return;
         }
-        if (maxDrawInterceptValue == null ? false : interceptValue > maxDrawInterceptValue) {
+        if (maxDrawInterceptValue != null && interceptValue > maxDrawInterceptValue) {
             return;
         }
         interceptDrawer.draw(interceptValue);
@@ -101,7 +101,7 @@ public final class StandardLineDrawer extends LineDrawer {
             data1 = null;
 
             // Desativar correção da previewLine
-            fixPreviewLineStart.disable();
+//            fixPreviewLineStart.disable();
         }
     }
 
@@ -109,27 +109,21 @@ public final class StandardLineDrawer extends LineDrawer {
 
         @Override
         public void handle(MouseEvent event) {
-            if (event.isPrimaryButtonDown() && lineData.size() < 2) {
-                // Botão esquerdo do mouse
-                // Menos de um dois pontos, logo serão criados no máximo dois pontos
+            // MouseEvent source: chartPane
 
-                // Obter ponto em relação ao gráfico
+            if (event.isPrimaryButtonDown() && !isDrawn()) {
+                // Primary mouse button and we have less than two points
+
+                // Get data values relative to the chart plot
                 Point2D dataPoint = mouseEventToDataValues(event);
                 XYChart.Data<Number, Number> data = new XYChart.Data<>(dataPoint.getX(), dataPoint.getY());
 
-                // Desenhar ponto no gráfico
                 if (data1 == null) {
-                    // Se o primeiro ponto ainda não foi desenhado
-                    // Desenhar ponto 1
+                    // Add 1st data
                     setPoint1(data);
-                    enablePreviewLine(data1);
-                    double previewLineStartX = event.getX();
-                    double previewLineStartY = event.getY();
-                    previewLine.setStart(previewLineStartX, previewLineStartY);
-                    previewLine.setEnd(previewLineStartX, previewLineStartY);
+                    enablePreviewLine(event.getX(), event.getY());
                 } else {
-                    // Se algum ponto já foi desenhado
-                    // Desenhar ponto 2
+                    // Add 2nd data
                     setPoint2(data);
                     disablePreviewLine();
                     chartPane.setCursor(Cursor.DEFAULT);
@@ -155,8 +149,7 @@ public final class StandardLineDrawer extends LineDrawer {
                     lineData.remove(data2);
                     data2 = null;
                     chartPane.setCursor(Cursor.CROSSHAIR);
-                    enablePreviewLine(data1);
-                    previewLine.setEnd(event.getX(), event.getY());
+                    enablePreviewLine(event.getX(), event.getY());
                     drawn.set(false);
                 } else {
                     lineData.remove(data1);
@@ -169,23 +162,31 @@ public final class StandardLineDrawer extends LineDrawer {
         }
     }
 
+    protected void enablePreviewLine(double endX, double endY) {
+        Point2D previewLineStart = dataValuesToChartPaneCoordinates(
+                data1.getXValue().doubleValue(),
+                data1.getYValue().doubleValue());
+        super.enablePreviewLine(previewLineStart, new Point2D(endX, endY));
+    }
+
     @Override
     protected void enableDataMouseDragging(XYChart.Data<Number, Number> data) {
         Node dataNode = data.getNode();
         dataNode.setCursor(Cursor.OPEN_HAND);
 
         dataNode.setOnMousePressed((MouseEvent event) -> {
-            if (event.isMiddleButtonDown()) {
+            if (event.isPrimaryButtonDown()) {
                 if (data.equals(data1)) {
                     data1 = data2;
                     data2 = data;
                 }
+                dataNode.setCursor(Cursor.CLOSED_HAND);
                 drawn.set(false);
             }
             event.consume();
         });
         dataNode.setOnMouseDragged((MouseEvent event) -> {
-            if (event.isMiddleButtonDown()) {
+            if (event.isPrimaryButtonDown()) {
                 Point2D newDataPoint = mouseEventToDataValues(event);
                 data.setXValue(newDataPoint.getX());
                 data.setYValue(newDataPoint.getY());
@@ -194,6 +195,7 @@ public final class StandardLineDrawer extends LineDrawer {
         });
         dataNode.setOnMouseReleased((MouseEvent event) -> {
             drawn.set(true);
+            dataNode.setCursor(Cursor.OPEN_HAND);
             event.consume();
         });
     }

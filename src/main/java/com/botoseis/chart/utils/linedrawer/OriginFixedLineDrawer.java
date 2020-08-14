@@ -6,27 +6,25 @@ import javafx.scene.Node;
 import javafx.scene.chart.XYChart;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
-import javafx.stage.Stage;
 
 public final class OriginFixedLineDrawer extends LineDrawer {
 
     private final PreviewLine previewLineMirror;
-    private final FixLineStart fixPreviewLineMirrorStart;
-    private final XYChart.Data<Number, Number> fixedData;
+    private static final double ORIGIN_X = 0;
+    private static final double ORIGIN_Y = 0;
+    private static final XYChart.Data<Number, Number> ORIGIN_DATA = new XYChart.Data<>(ORIGIN_X, ORIGIN_Y);
 
     public OriginFixedLineDrawer(XYChart<Number, Number> chart, Pane chartPane, String color, char shape) {
         super(chart, chartPane, color, shape);
 
-        // Eventos do mouse
-        this.mousePressedHandler = new DirectWaveMousePressedHandler();
+        // Mouse events
+        this.mousePressedHandler = new OriginFixedMousePressedHandler();
         this.mouseMovedHandler = new DirectWaveMouseMovedHandler();
 
-        // Linha de prévia espelhada
+        // Preview line mirror
         this.previewLineMirror = new PreviewLine();
         chartPane.getChildren().add(this.previewLineMirror);
-        this.fixPreviewLineMirrorStart = new FixLineStart(previewLineMirror, (Stage) chart.getScene().getWindow());
-
-        this.fixedData = new XYChart.Data<>(0, 0);
+//        this.fixPreviewLineMirrorStart = new FixPreviewLineStart(previewLineMirror, (Stage) chart.getScene().getWindow());
     }
 
     @Override
@@ -37,19 +35,14 @@ public final class OriginFixedLineDrawer extends LineDrawer {
         // Se a linha ainda não foi desenhada
         if (!drawn.get()) {
             // Inserir coordenada (0, 0) no gráfico
-            setPoint1(fixedData);
+            setPoint1(ORIGIN_DATA);
 
             // Ativar linhas de prévia
-            Point2D paneCoordinates = dataValuesToChartPaneCoordinates(0, 0);
-            previewLine.setStart(paneCoordinates.getX(), paneCoordinates.getY());
-            previewLineMirror.setStart(paneCoordinates.getX(), paneCoordinates.getY());
-            previewLine.setVisible(true);
-            previewLineMirror.setVisible(true);
-            chartPane.addEventHandler(MouseEvent.MOUSE_MOVED, mouseMovedHandler);
+            enablePreviewLine(ORIGIN_X, ORIGIN_Y);
 
             // Ativar correção da previewLine ao redimensionar o gráfico
-            fixPreviewLineStart.enable(0, 0);
-            fixPreviewLineMirrorStart.enable(0, 0);
+//            fixPreviewLineStart.enable(0, 0);
+//            fixPreviewLineMirrorStart.enable(0, 0);
         }
 
     }
@@ -72,8 +65,8 @@ public final class OriginFixedLineDrawer extends LineDrawer {
             data1 = null;
 
             // Desativar correção das linhas de prévia
-            fixPreviewLineStart.disable();
-            fixPreviewLineMirrorStart.disable();
+//            fixPreviewLineStart.disable();
+//            fixPreviewLineMirrorStart.disable();
         }
     }
 
@@ -84,40 +77,41 @@ public final class OriginFixedLineDrawer extends LineDrawer {
         data1.getNode().setVisible(false);
     }
 
-    private class DirectWaveMousePressedHandler extends MousePressedHandler {
-
+    private class OriginFixedMousePressedHandler extends MousePressedHandler {
         @Override
         public void handle(MouseEvent event) {
+            // MouseEvent source: chartPane
 
-            // Botão esquerdo do mouse
-            // Não está desenhado
-            if (event.isPrimaryButtonDown() && !drawn.get()) {
-                // Inserir ponto 2
-                // a Series terá no máximo dois pontos
-
-                // Coordenada no gráfico
-                Point2D dataPoint = mouseEventToDataValues(event);
-                setPoint2(dataPoint);
+            if (event.isPrimaryButtonDown() && !isDrawn()) {
+                // Add 2nd data
+                setPoint2(mouseEventToDataValues(event));
                 disablePreviewLine();
                 chartPane.setCursor(Cursor.DEFAULT);
                 drawn.set(true);
-
             } else if (event.isSecondaryButtonDown() && drawn.get()) {
-                // Apagar ponto 2
+                // Remove 2nd data
                 lineData.remove(data2);
                 data2 = null;
-
-                enablePreviewLine(data1);
+                enablePreviewLine(event.getX(), event.getY());
                 chartPane.setCursor(Cursor.CROSSHAIR);
-
-                // Coordenadas da previewLine
-                previewLine.setEnd(event.getX(), event.getY());
-                previewLineMirror.setEnd(2 * previewLine.getStartX() - event.getX(), event.getY());
-
                 drawn.set(false);
             }
         }
+    }
 
+    protected void enablePreviewLine(double endX, double endY) {
+        Point2D previewLineStart = dataValuesToChartPaneCoordinates(ORIGIN_X, ORIGIN_Y);
+        super.enablePreviewLine(previewLineStart, new Point2D(endX, endY));
+        enablePreviewLineMirror(endX, endY);
+    }
+
+    private void enablePreviewLineMirror(double endX, double endY) {
+        previewLineMirror.setStart(dataValuesToChartPaneCoordinates(0, 0));
+        previewLineMirror.setEnd(2 * dataValuesToChartPaneCoordinates(0, 0).getX() - endX, endY);
+        previewLineMirror.setVisible(true);
+//        fixPreviewLineMirrorStart.enable(
+//                data1.getXValue().doubleValue(),
+//                data1.getXValue().doubleValue());
     }
 
     @Override
@@ -126,22 +120,25 @@ public final class OriginFixedLineDrawer extends LineDrawer {
         dataNode.setCursor(Cursor.OPEN_HAND);
 
         dataNode.setOnMousePressed((MouseEvent event) -> {
-            if (event.isMiddleButtonDown()) {
+            if (event.isPrimaryButtonDown()) {
                 drawn.set(false);
-                enablePreviewLineMirror();
+
+                // Conversion needed because this MouseEvent's source Node is dataNode, not chartPane
+                Point2D pointRelativeToChartPane = chartPane.sceneToLocal(event.getSceneX(), event.getSceneY());
+                enablePreviewLineMirror(pointRelativeToChartPane.getX(), pointRelativeToChartPane.getY());
+
+                dataNode.setCursor(Cursor.CLOSED_HAND);
             }
             event.consume();
         });
 
         dataNode.setOnMouseDragged((MouseEvent event) -> {
-            if (event.isMiddleButtonDown()) {
+            if (event.isPrimaryButtonDown()) {
                 Point2D newDataPoint = mouseEventToDataValues(event);
                 data.setXValue(newDataPoint.getX());
                 data.setYValue(newDataPoint.getY());
 
-                Point2D pointRelativeToScene = new Point2D(event.getSceneX(), event.getSceneY());
-                Point2D pointRelativeToChartPane = chartPane.sceneToLocal(pointRelativeToScene);
-
+                Point2D pointRelativeToChartPane = chartPane.sceneToLocal(event.getSceneX(), event.getSceneY());
                 previewLineMirror.setEnd(2 * dataValuesToChartPaneCoordinates(0, 0).getX() - pointRelativeToChartPane.getX(), pointRelativeToChartPane.getY());
             }
             event.consume();
@@ -149,21 +146,9 @@ public final class OriginFixedLineDrawer extends LineDrawer {
         dataNode.setOnMouseReleased((MouseEvent event) -> {
             drawn.set(true);
             disablePreviewLineMirror();
+            dataNode.setCursor(Cursor.OPEN_HAND);
             event.consume();
         });
-    }
-
-    @Override
-    protected void enablePreviewLine(XYChart.Data<Number, Number> lineStartData) {
-        super.enablePreviewLine(lineStartData);
-        enablePreviewLineMirror();
-    }
-
-    private void enablePreviewLineMirror() {
-        previewLineMirror.setVisible(true);
-        fixPreviewLineMirrorStart.enable(
-                data1.getXValue().doubleValue(),
-                data1.getXValue().doubleValue());
     }
 
     @Override
@@ -174,7 +159,7 @@ public final class OriginFixedLineDrawer extends LineDrawer {
 
     private void disablePreviewLineMirror() {
         previewLineMirror.setVisible(false);
-        fixPreviewLineMirrorStart.disable();
+//        fixPreviewLineMirrorStart.disable();
     }
 
     private class DirectWaveMouseMovedHandler extends MouseMovedHandler {

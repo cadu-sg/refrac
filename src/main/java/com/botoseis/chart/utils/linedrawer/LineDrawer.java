@@ -2,9 +2,7 @@ package com.botoseis.chart.utils.linedrawer;
 
 import com.botoseis.chart.utils.SeriesLayout;
 import javafx.animation.PauseTransition;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.*;
 import javafx.beans.value.ChangeListener;
 import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
@@ -34,7 +32,7 @@ public abstract class LineDrawer {
 
     protected MousePressedHandler mousePressedHandler;
     protected MouseMovedHandler mouseMovedHandler;
-    protected FixLineStart fixPreviewLineStart;
+//    protected FixPreviewLineStart fixPreviewLineStart;
 
     protected XYChart.Data<Number, Number> data1;
     protected XYChart.Data<Number, Number> data2;
@@ -111,8 +109,8 @@ public abstract class LineDrawer {
 
         // Preview line
         this.previewLine = new PreviewLine();
-        chartPane.getChildren().add(this.previewLine);
-        this.fixPreviewLineStart = new FixLineStart(this.previewLine, (Stage) chart.getScene().getWindow());
+        chartPane.getChildren().add(previewLine);
+//        this.fixPreviewLineStart = new FixPreviewLineStart(previewLine, (Stage) chart.getScene().getWindow());
 
         // Properties
         this.slope = new SimpleDoubleProperty(UNDEFINED);
@@ -272,7 +270,7 @@ public abstract class LineDrawer {
        obter suas coordenadas em relação aos eixos dos gráfico */
 
     /**
-     * Given a MouseEvent, obtain its coordinate values relative to the plot (data value)
+     * Transforms MouseEvent positions into data values (coordinates relative to the chart plot)
      *
      * @param event mouse event
      * @return data values
@@ -305,15 +303,16 @@ public abstract class LineDrawer {
 
     protected abstract void enableDataMouseDragging(XYChart.Data<Number, Number> data);
 
-    protected void enablePreviewLine(XYChart.Data<Number, Number> lineStartData) {
+    protected void enablePreviewLine(Point2D start, Point2D end) {
         // Enable preview line
+        previewLine.setStart(start);
+        previewLine.setEnd(end);
         previewLine.setVisible(true);
         chartPane.addEventHandler(MouseEvent.MOUSE_MOVED, mouseMovedHandler);
-
         // Enable preview line correction when resizing the chart
-        fixPreviewLineStart.enable(
-                lineStartData.getXValue().doubleValue(),
-                lineStartData.getYValue().doubleValue());
+//        fixPreviewLineStart.enable(
+//                lineStartData.getXValue().doubleValue(),
+//                lineStartData.getYValue().doubleValue());
     }
 
     protected void disablePreviewLine() {
@@ -322,47 +321,80 @@ public abstract class LineDrawer {
         chartPane.removeEventHandler(MouseEvent.MOUSE_MOVED, mouseMovedHandler);
 
         // Disable preview line correction when resizing the chart
-        fixPreviewLineStart.disable();
+//        fixPreviewLineStart.disable();
     }
 
     protected abstract class MouseMovedHandler implements EventHandler<MouseEvent> {
 
     }
 
-    protected final class FixLineStart {
+    protected final class FixPreviewLineStart {
 
         private double x;
         private double y;
-        private final Stage stage;
-        private final ChangeListener<Number> dimensionChangeListener;
+        private final PreviewLine previewLine;
+        private final ReadOnlyDoubleProperty stageWidth;
+        private final ReadOnlyDoubleProperty stageHeight;
+        private final DoubleProperty xAxisLowerBound;
+        private final DoubleProperty xAxisUpperBound;
+        private final DoubleProperty yAxisLowerBound;
+        private final DoubleProperty yAxisUpperBound;
+
+        private final ChangeListener<Number> chartResizedListener;
         private Thread processDimensionChangeThread;
         private final BlockingQueue<Point2D> dimensionChangeQueue;
-        private final PreviewLine line;
 
-        public FixLineStart(PreviewLine line, Stage stage) {
-            this.line = line;
+        protected FixPreviewLineStart(PreviewLine previewLine, Stage stage) {
+            this.previewLine = previewLine;
+            this.stageWidth = stage.widthProperty();
+            this.stageHeight = stage.heightProperty();
+            this.xAxisLowerBound = xAxis.lowerBoundProperty();
+            this.xAxisUpperBound = xAxis.upperBoundProperty();
+            this.yAxisLowerBound = yAxis.lowerBoundProperty();
+            this.yAxisUpperBound = yAxis.upperBoundProperty();
 
-            this.x = 0;
-            this.y = 0;
             this.dimensionChangeQueue = new ArrayBlockingQueue<>(1);
 
             PauseTransition coalesceChanges = new PauseTransition(Duration.millis(300));
-
             coalesceChanges.setOnFinished((event) -> {
                 this.dimensionChangeQueue.clear();
                 this.dimensionChangeQueue.add(new Point2D(stage.getWidth(), stage.getHeight()));
             });
 
-            this.dimensionChangeListener = (observable, oldValue, newValue) -> {
-                coalesceChanges.playFromStart();
-            };
+            this.chartResizedListener = (observable, oldValue, newValue) ->
+                    coalesceChanges.playFromStart();
+        }
 
-            this.stage = stage;
+        protected void enable(double x, double y) {
+            this.x = x;
+            this.y = y;
+            this.previewLine.setStart(dataValuesToChartPaneCoordinates(x, y));
+
+            stageWidth.addListener(chartResizedListener);
+            stageHeight.addListener(chartResizedListener);
+            xAxisLowerBound.addListener(chartResizedListener);
+            xAxisUpperBound.addListener(chartResizedListener);
+            yAxisLowerBound.addListener(chartResizedListener);
+            yAxisUpperBound.addListener(chartResizedListener);
+
+            processDimensionChangeThread = new ProcessDimensionChangeThread();
+            processDimensionChangeThread.start();
+        }
+
+        protected void disable() {
+            stageWidth.removeListener(chartResizedListener);
+            stageHeight.removeListener(chartResizedListener);
+            xAxisLowerBound.removeListener(chartResizedListener);
+            xAxisUpperBound.removeListener(chartResizedListener);
+            yAxisLowerBound.removeListener(chartResizedListener);
+            yAxisUpperBound.removeListener(chartResizedListener);
+
+            processDimensionChangeThread.interrupt();
         }
 
         private class ProcessDimensionChangeThread extends Thread {
 
-            public ProcessDimensionChangeThread() {
+            ProcessDimensionChangeThread() {
                 this.setDaemon(true);
             }
 
@@ -370,46 +402,14 @@ public abstract class LineDrawer {
             public void run() {
                 try {
                     while (true) {
-                        // System.out.println("Waiting for change in size");
                         Point2D size = dimensionChangeQueue.take();
-                        // System.out.printf("Detected change in size to [%.1f, %.1f]: processing\n", size.getX(), size.getY());
-                        line.setStart(dataValuesToChartPaneCoordinates(x, y));
-                        // System.out.println("Done processing");
+                        previewLine.setStart(dataValuesToChartPaneCoordinates(x, y));
                     }
                 } catch (InterruptedException ignored) {
 
                 }
             }
         }
-
-        public void enable(double x, double y) {
-            this.x = x;
-            this.y = y;
-            this.line.setStart(dataValuesToChartPaneCoordinates(x, y));
-
-            this.stage.widthProperty().addListener(dimensionChangeListener);
-            this.stage.heightProperty().addListener(dimensionChangeListener);
-            xAxis.lowerBoundProperty().addListener(dimensionChangeListener);
-            xAxis.upperBoundProperty().addListener(dimensionChangeListener);
-            yAxis.lowerBoundProperty().addListener(dimensionChangeListener);
-            yAxis.upperBoundProperty().addListener(dimensionChangeListener);
-
-            this.processDimensionChangeThread = new ProcessDimensionChangeThread();
-            this.processDimensionChangeThread.start();
-        }
-
-        public void disable() {
-
-            this.stage.widthProperty().removeListener(dimensionChangeListener);
-            this.stage.heightProperty().removeListener(dimensionChangeListener);
-            xAxis.lowerBoundProperty().removeListener(dimensionChangeListener);
-            xAxis.upperBoundProperty().removeListener(dimensionChangeListener);
-            yAxis.lowerBoundProperty().removeListener(dimensionChangeListener);
-            yAxis.upperBoundProperty().removeListener(dimensionChangeListener);
-
-            this.processDimensionChangeThread.interrupt();
-        }
-
     }
 
     protected static final class PreviewLine extends Line {
