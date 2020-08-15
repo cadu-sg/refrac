@@ -57,10 +57,6 @@ public class SeriesLayout {
         });
     }
 
-    public static void setDataStyle(XYChart.Data<Number, Number> data, String color, String shape) {
-        data.getNode().setStyle(getSymbolStyleString(color, shape));
-    }
-
     public void setSymbolsColor(String color) {
         symbolColor = color;
 
@@ -183,6 +179,14 @@ public class SeriesLayout {
     }
 
     public void setLineVisible(boolean value) {
+        series.getNode().setVisible(value);
+    }
+
+    public static void setDataStyle(XYChart.Data<Number, Number> data, String color, String shape) {
+        data.getNode().setStyle(getSymbolStyleString(color, shape));
+    }
+
+    public static void setLineVisible(XYChart.Series<Number, Number> series, boolean value) {
         series.getNode().setVisible(value);
     }
 }

@@ -141,7 +141,7 @@ public abstract class LineDrawer {
     protected abstract void onDisabledHandler();
 
     protected void onDrawnHandler() {
-        updateCoefficients();
+        computeCoefficients();
     }
 
     protected void onErasedHandler() {
@@ -149,7 +149,7 @@ public abstract class LineDrawer {
         intercept.set(UNDEFINED);
     }
 
-    protected final void updateCoefficients() {
+    protected final void computeCoefficients() {
         double x1 = data1.getXValue().doubleValue();
         double y1 = data1.getYValue().doubleValue();
         double x2 = data2.getXValue().doubleValue();
@@ -181,6 +181,12 @@ public abstract class LineDrawer {
         enableDataMouseDragging(data1);
         SeriesLayout.setDataStyle(data1, color, "h" + shape);
     }
+
+//    public void removePoint1() {
+//        lineData.remove(data1);
+//        data1 = null;
+//        seriesLayout.setLineVisible(false);
+//    }
 
     public final void setPoint2(Point2D point) {
         setPoint2(point.getX(), point.getY());

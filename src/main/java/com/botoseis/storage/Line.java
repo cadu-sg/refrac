@@ -89,7 +89,7 @@ public final class Line {
                 Paths.get(homeDir.toString(), "draw_points.bin"), shotAmount);
 
         // Interpretations CSV file
-        Path interpretationsPath = Paths.get(homeDir.toString(), "interpretations.csv");
+//        Path interpretationsPath = Paths.get(homeDir.toString(), "interpretations.csv");
 
         return new Line(homeDir, picksTxt, picksBin, drawPointsBin);
     }

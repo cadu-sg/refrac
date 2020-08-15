@@ -87,21 +87,21 @@ public class MainController {
     @FXML
     private GridPane container_interpretation;
     @FXML
-    private RadioButton radbtn_refraction3L;
+    private RadioButton radioButton_refraction3L;
     @FXML
-    private RadioButton radbtn_refraction2L;
+    private RadioButton radioButton_refraction2L;
     @FXML
-    private RadioButton radbtn_refraction1L;
+    private RadioButton radioButton_refraction1L;
     @FXML
-    private RadioButton radbtn_directL;
+    private RadioButton radioButton_directL;
     @FXML
-    private RadioButton radbtn_directR;
+    private RadioButton radioButton_directR;
     @FXML
-    private RadioButton radbtn_refraction1R;
+    private RadioButton radioButton_refraction1R;
     @FXML
-    private RadioButton radbtn_refraction2R;
+    private RadioButton radioButton_refraction2R;
     @FXML
-    private RadioButton radbtn_refraction3R;
+    private RadioButton radioButton_refraction3R;
 
     @FXML
     public void initialize() {
@@ -148,14 +148,14 @@ public class MainController {
         pickChart = new PickChart(container_pickChart);
         pickChart.assignToolsControllers(
                 toggleButton_zoom.selectedProperty(), toggleButton_eraser.selectedProperty(),
-                radbtn_refraction3L.selectedProperty(),
-                radbtn_refraction2L.selectedProperty(),
-                radbtn_refraction1L.selectedProperty(),
-                radbtn_directL.selectedProperty(),
-                radbtn_directR.selectedProperty(),
-                radbtn_refraction1R.selectedProperty(),
-                radbtn_refraction2R.selectedProperty(),
-                radbtn_refraction3R.selectedProperty());
+                radioButton_refraction3L.selectedProperty(),
+                radioButton_refraction2L.selectedProperty(),
+                radioButton_refraction1L.selectedProperty(),
+                radioButton_directL.selectedProperty(),
+                radioButton_directR.selectedProperty(),
+                radioButton_refraction1R.selectedProperty(),
+                radioButton_refraction2R.selectedProperty(),
+                radioButton_refraction3R.selectedProperty());
 
         shotAmount = line.getShotAmount();
         mainShotIndex = 0;
@@ -169,14 +169,14 @@ public class MainController {
         label_seqNum.setText("");
         label_shotStat.setText("");
 
-        radbtn_refraction3L.setSelected(false);
-        radbtn_refraction2L.setSelected(false);
-        radbtn_refraction1L.setSelected(false);
-        radbtn_directL.setSelected(false);
-        radbtn_directR.setSelected(false);
-        radbtn_refraction1R.setSelected(false);
-        radbtn_refraction2R.setSelected(false);
-        radbtn_refraction3R.setSelected(false);
+        radioButton_refraction3L.setSelected(false);
+        radioButton_refraction2L.setSelected(false);
+        radioButton_refraction1L.setSelected(false);
+        radioButton_directL.setSelected(false);
+        radioButton_directR.setSelected(false);
+        radioButton_refraction1R.setSelected(false);
+        radioButton_refraction2R.setSelected(false);
+        radioButton_refraction3R.setSelected(false);
 
         container_pickChart.getChildren().clear();
         pickChart = null;
@@ -242,7 +242,7 @@ public class MainController {
     }
 
     /**
-     * Plots shots from loadedShots
+     * Plots shots from loadedShots list
      */
     private void plotLoadedShots() {
         if (loadedShots.size() == 1) {
@@ -321,11 +321,7 @@ public class MainController {
                 System.out.println("Project title: " + project.getTitle());
                 System.out.println("Project folder: " + project.getHomeDir());
             } catch (IOException e) {
-                Alert alert = new Alert(AlertType.ERROR);
-                alert.setTitle("Error");
-                alert.setHeaderText("Cannot create project");
-                alert.setContentText(e.getMessage());
-                alert.showAndWait();
+                showErrorAlert("Cannot create project", e.getMessage());
             }
         });
         event.consume();
@@ -347,11 +343,7 @@ public class MainController {
                 System.out.println("Project title: " + project.getTitle());
                 System.out.println("Project folder: " + project.getHomeDir());
             } catch (Exception e) {
-                Alert alert = new Alert(AlertType.ERROR);
-                alert.setTitle("Error");
-                alert.setHeaderText("Cannot open project");
-                alert.setContentText(e.getMessage());
-                alert.showAndWait();
+                showErrorAlert("Cannot open project", e.getMessage());
             }
         });
         event.consume();

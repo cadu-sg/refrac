@@ -12,7 +12,7 @@ public final class OriginFixedLineDrawer extends LineDrawer {
     private final PreviewLine previewLineMirror;
     private static final double ORIGIN_X = 0;
     private static final double ORIGIN_Y = 0;
-    private static final XYChart.Data<Number, Number> ORIGIN_DATA = new XYChart.Data<>(ORIGIN_X, ORIGIN_Y);
+    private final XYChart.Data<Number, Number> ORIGIN_DATA;
 
     public OriginFixedLineDrawer(XYChart<Number, Number> chart, Pane chartPane, String color, char shape) {
         super(chart, chartPane, color, shape);
@@ -25,6 +25,8 @@ public final class OriginFixedLineDrawer extends LineDrawer {
         this.previewLineMirror = new PreviewLine();
         chartPane.getChildren().add(this.previewLineMirror);
 //        this.fixPreviewLineMirrorStart = new FixPreviewLineStart(previewLineMirror, (Stage) chart.getScene().getWindow());
+
+        this.ORIGIN_DATA = new XYChart.Data<>(ORIGIN_X, ORIGIN_Y);
     }
 
     @Override
@@ -49,25 +51,24 @@ public final class OriginFixedLineDrawer extends LineDrawer {
 
     @Override
     protected final void onDisabledHandler() {
-        // Desativar linhas de prévia
+        // Hide preview line
         previewLine.setVisible(false);
         previewLineMirror.setVisible(false);
 
         chartPane.removeEventHandler(MouseEvent.MOUSE_PRESSED, mousePressedHandler);
-        // OBS: mouseMovedHandler já terá sido desativado se a linha foi completamente desenhada
+        // Obs.: mouseMovedHandler would already be removed if the line was drawn
 
-        // Lidar com o caso de desativar tendo desenhado apenas um ponto
+        // Handle disable when only data1 was drawn
         if (data2 == null) {
-            chartPane.setCursor(Cursor.DEFAULT);
-
             chartPane.removeEventHandler(MouseEvent.MOUSE_MOVED, mouseMovedHandler);
             lineData.clear();
             data1 = null;
-
-            // Desativar correção das linhas de prévia
+            // Disable fix preview line start
 //            fixPreviewLineStart.disable();
 //            fixPreviewLineMirrorStart.disable();
+            seriesLayout.setLineVisible(false);
         }
+        chartPane.setCursor(Cursor.DEFAULT);
     }
 
     @Override
@@ -88,6 +89,7 @@ public final class OriginFixedLineDrawer extends LineDrawer {
                 disablePreviewLine();
                 chartPane.setCursor(Cursor.DEFAULT);
                 drawn.set(true);
+                seriesLayout.setLineVisible(true);
             } else if (event.isSecondaryButtonDown() && drawn.get()) {
                 // Remove 2nd data
                 lineData.remove(data2);
@@ -95,6 +97,7 @@ public final class OriginFixedLineDrawer extends LineDrawer {
                 enablePreviewLine(event.getX(), event.getY());
                 chartPane.setCursor(Cursor.CROSSHAIR);
                 drawn.set(false);
+                seriesLayout.setLineVisible(false);
             }
         }
     }

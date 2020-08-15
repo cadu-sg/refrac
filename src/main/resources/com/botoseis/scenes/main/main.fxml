@@ -101,7 +101,7 @@
       </ToolBar>
       <SplitPane dividerPositions="0.3" VBox.vgrow="ALWAYS">
          <items>
-            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" prefHeight="200.0" prefWidth="200.0">
+            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" prefHeight="200.0" prefWidth="200.0" SplitPane.resizableWithParent="false">
                <content>
                   <VBox>
                      <children>
@@ -162,10 +162,10 @@
                                     <Label text="Refracted 3" GridPane.rowIndex="4" />
                                     <Label text="Left" GridPane.columnIndex="1" />
                                     <Label text="Right" GridPane.columnIndex="2" />
-                                    <RadioButton fx:id="radbtn_directL" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="1" GridPane.rowIndex="1" />
-                                    <RadioButton fx:id="radbtn_refraction1L" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="1" GridPane.rowIndex="2" />
-                                    <RadioButton fx:id="radbtn_refraction2L" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="1" GridPane.rowIndex="3" />
-                                    <RadioButton fx:id="radbtn_refraction3L" mnemonicParsing="false" GridPane.columnIndex="1" GridPane.rowIndex="4">
+                                    <RadioButton fx:id="radioButton_directL" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                    <RadioButton fx:id="radioButton_refraction1L" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                    <RadioButton fx:id="radioButton_refraction2L" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                                    <RadioButton fx:id="radioButton_refraction3L" mnemonicParsing="false" GridPane.columnIndex="1" GridPane.rowIndex="4">
                                        <GridPane.margin>
                                           <Insets />
                                        </GridPane.margin>
@@ -173,10 +173,10 @@
                                           <Insets right="-6.0" />
                                        </padding>
                                     </RadioButton>
-                                    <RadioButton fx:id="radbtn_directR" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="2" GridPane.rowIndex="1" />
-                                    <RadioButton fx:id="radbtn_refraction1R" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="2" GridPane.rowIndex="2" />
-                                    <RadioButton fx:id="radbtn_refraction2R" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="2" GridPane.rowIndex="3" />
-                                    <RadioButton fx:id="radbtn_refraction3R" mnemonicParsing="false" GridPane.columnIndex="2" GridPane.rowIndex="4">
+                                    <RadioButton fx:id="radioButton_directR" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                                    <RadioButton fx:id="radioButton_refraction1R" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+                                    <RadioButton fx:id="radioButton_refraction2R" mnemonicParsing="false" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+                                    <RadioButton fx:id="radioButton_refraction3R" mnemonicParsing="false" GridPane.columnIndex="2" GridPane.rowIndex="4">
                                        <padding>
                                           <Insets right="-6.0" />
                                        </padding>

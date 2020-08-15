@@ -138,12 +138,12 @@ public final class PickChart {
         intersection_head1R_head2R = new IntersectionDetector(drawer_head1R, drawer_head2R);
         intersection_head2R_head3R = new IntersectionDetector(drawer_head2R, drawer_head3R);
 
-        VerticalMarkerGenerator marker_head3L_head2L = new VerticalMarkerGenerator(chart, intersection_head3L_head2L);
-        VerticalMarkerGenerator marker_head2L_head1L = new VerticalMarkerGenerator(chart, intersection_head2L_head1L);
-        VerticalMarkerGenerator marker_head1L_directL = new VerticalMarkerGenerator(chart, intersection_head1L_directL);
-        VerticalMarkerGenerator marker_directR_head1R = new VerticalMarkerGenerator(chart, intersection_directR_head1R);
-        VerticalMarkerGenerator marker_head1R_head2R = new VerticalMarkerGenerator(chart, intersection_head1R_head2R);
-        VerticalMarkerGenerator marker_head2R_head3R = new VerticalMarkerGenerator(chart, intersection_head2R_head3R);
+        new VerticalMarkerGenerator(chart, intersection_head3L_head2L);
+        new VerticalMarkerGenerator(chart, intersection_head2L_head1L);
+        new VerticalMarkerGenerator(chart, intersection_head1L_directL);
+        new VerticalMarkerGenerator(chart, intersection_directR_head1R);
+        new VerticalMarkerGenerator(chart, intersection_head1R_head2R);
+        new VerticalMarkerGenerator(chart, intersection_head2R_head3R);
 
     }
 

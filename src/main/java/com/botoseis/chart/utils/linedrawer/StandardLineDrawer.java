@@ -12,18 +12,20 @@ import javafx.scene.layout.Pane;
 public final class StandardLineDrawer extends LineDrawer {
 
     private final InterceptDrawer interceptDrawer;
-    private Double minDrawInterceptValue;
-    private Double maxDrawInterceptValue;
 
     public StandardLineDrawer(XYChart<Number, Number> chart, Pane chartPane, String color, char shape) {
         super(chart, chartPane, color, shape);
 
-        // Eventos do mouse
+        // Mouse events
         this.mousePressedHandler = new StandardMousePressedHandler();
         this.mouseMovedHandler = new StandardMouseMovedHandler();
 
-        // Desenhador de interseção
         this.interceptDrawer = new InterceptDrawer(chart);
+
+        System.out.println(isDrawn() ? "drawn" : "NOT drawn");
+//        drawn.addListener((observable, oldValue, newValue) -> {
+//            System.out.println(newValue ? "drawn" : "NOT drawn");
+//        });
     }
 
     private class InterceptDrawer {
@@ -31,11 +33,12 @@ public final class StandardLineDrawer extends LineDrawer {
         private final XYChart.Data<Number, Number> data;
         private final ObservableList<XYChart.Data<Number, Number>> dataList;
 
-        public InterceptDrawer(XYChart chart) {
+        public InterceptDrawer(XYChart<Number, Number> chart) {
             XYChart.Series<Number, Number> interceptSeries = new XYChart.Series<>();
             this.dataList = interceptSeries.getData();
             this.data = new XYChart.Data<>(0, 0);
             chart.getData().add(interceptSeries);
+            SeriesLayout.setLineVisible(interceptSeries, false);
         }
 
         public void draw(double interceptValue) {
@@ -47,29 +50,12 @@ public final class StandardLineDrawer extends LineDrawer {
         public void clear() {
             this.dataList.clear();
         }
-
-    }
-
-    public void setMinInterceptValue(double value) {
-        this.minDrawInterceptValue = value;
-    }
-
-    public void setMaxDrawInterceptValue(double value) {
-        this.maxDrawInterceptValue = value;
     }
 
     @Override
     protected void onDrawnHandler() {
-        updateCoefficients();
-        double interceptValue = intercept.get();
-
-        if (minDrawInterceptValue != null && interceptValue < minDrawInterceptValue) {
-            return;
-        }
-        if (maxDrawInterceptValue != null && interceptValue > maxDrawInterceptValue) {
-            return;
-        }
-        interceptDrawer.draw(interceptValue);
+        super.onDrawnHandler();
+        interceptDrawer.draw(intercept.get());
     }
 
     @Override
@@ -86,33 +72,32 @@ public final class StandardLineDrawer extends LineDrawer {
 
     @Override
     protected final void onDisabledHandler() {
-        // Desativar linha de prévia
+        // Hide preview line
         previewLine.setVisible(false);
 
         chartPane.removeEventHandler(MouseEvent.MOUSE_PRESSED, mousePressedHandler);
-        // OBS: mouseMovedHandler já terá sido desativado se a linha foi completamente desenhada
+        // Obs.: mouseMovedHandler would already be removed if the line was drawn
 
-        // Lidar com o caso de desativar tendo desenhado apenas o ponto 1
+        // Handle disable when only data1 was drawn
         if (data1 != null && data2 == null) {
-            chartPane.setCursor(Cursor.DEFAULT);
-
             chartPane.removeEventHandler(MouseEvent.MOUSE_MOVED, mouseMovedHandler);
             lineData.clear();
             data1 = null;
-
-            // Desativar correção da previewLine
+            // Disable fix preview line start
 //            fixPreviewLineStart.disable();
+            seriesLayout.setLineVisible(false);
         }
+        chartPane.setCursor(Cursor.DEFAULT);
     }
 
     private class StandardMousePressedHandler extends MousePressedHandler {
 
         @Override
         public void handle(MouseEvent event) {
-            // MouseEvent source: chartPane
+            // event source: chartPane
 
-            if (event.isPrimaryButtonDown() && !isDrawn()) {
-                // Primary mouse button and we have less than two points
+            if (event.isPrimaryButtonDown() && !drawn.get()) {
+                // Primary mouse button and line not drawn yet
 
                 // Get data values relative to the chart plot
                 Point2D dataPoint = mouseEventToDataValues(event);
@@ -128,11 +113,11 @@ public final class StandardLineDrawer extends LineDrawer {
                     disablePreviewLine();
                     chartPane.setCursor(Cursor.DEFAULT);
                     drawn.set(true);
+                    seriesLayout.setLineVisible(true);
                 }
 
             } else if (event.isSecondaryButtonDown() && !lineData.isEmpty()) {
-                // Botão direito do mouse
-                // Há pelo menos um ponto
+                // Secondary mouse button and at least one point was drawn
 
                 // Se o clique do mouse está mais perto do data1, ele quem será o data2 (que será apagado)
                 double eventX = mouseEventToDataValues(event).getX();
@@ -144,19 +129,21 @@ public final class StandardLineDrawer extends LineDrawer {
                     }
                 }
 
-                // Apaga o ponto 2 se ele estiver contido, senão apaga o ponto 1
+                // Erase point 2 if contained, or else erase point 1
                 if (lineData.contains(data2)) {
+                    // Remove 2nd data
                     lineData.remove(data2);
                     data2 = null;
-                    chartPane.setCursor(Cursor.CROSSHAIR);
                     enablePreviewLine(event.getX(), event.getY());
+                    chartPane.setCursor(Cursor.CROSSHAIR);
                     drawn.set(false);
                 } else {
+                    // Remove 1st data
                     lineData.remove(data1);
                     data1 = null;
                     disablePreviewLine();
+                    seriesLayout.setLineVisible(false);
                 }
-
             }
             event.consume();
         }
