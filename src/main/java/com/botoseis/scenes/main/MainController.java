@@ -1,12 +1,15 @@
 package com.botoseis.scenes.main;
 
 import com.botoseis.App;
+import com.botoseis.chart.LayerChart;
 import com.botoseis.chart.PickChart;
+import com.botoseis.math.LayerThicknessCalculator;
 import com.botoseis.scenes.main.dialogs.NewLineDialog;
 import com.botoseis.scenes.main.dialogs.NewProjectDialog;
 import com.botoseis.storage.Line;
 import com.botoseis.storage.Project;
 import com.botoseis.structs.Shot;
+import com.botoseis.structs.Station;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.event.ActionEvent;
@@ -24,16 +27,21 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 public class MainController {
+
+    private static final double UNDEFINED = 0;
 
     private Project project;
     private BooleanProperty projectLoaded;
     private Line line;
     private BooleanProperty lineLoaded;
     private PickChart pickChart;
+    private LayerChart layerChart;
+    private LayerThicknessCalculator layerThicknessCalculator;
     private static final Path USER_HOME = Paths.get(System.getProperty("user.home"));
 
     private int mainShotIndex;
@@ -54,6 +62,8 @@ public class MainController {
     private ToolBar container_toolbar;
     @FXML
     private StackPane container_pickChart;
+    @FXML
+    private StackPane container_layerChart;
     @FXML
     private GridPane container_layout;
     @FXML
@@ -154,6 +164,7 @@ public class MainController {
         setDisableLineLoadedNodes(false);
 
         pickChart = new PickChart(container_pickChart);
+
         pickChart.assignToolsControllers(
                 toggleButton_zoom.selectedProperty(), toggleButton_eraser.selectedProperty(),
                 radioButton_refraction3L.selectedProperty(),
@@ -165,10 +176,65 @@ public class MainController {
                 radioButton_refraction2R.selectedProperty(),
                 radioButton_refraction3R.selectedProperty());
 
+        layerChart = new LayerChart(line.getStations(), container_layerChart);
+
+        layerThicknessCalculator = new LayerThicknessCalculator(
+                pickChart.slope_head3L,
+                pickChart.slope_head2L,
+                pickChart.slope_head1L,
+                pickChart.slope_directL,
+                pickChart.slope_directR,
+                pickChart.slope_head1R,
+                pickChart.slope_head2R,
+                pickChart.slope_head3R,
+                pickChart.intercept_head3L,
+                pickChart.intercept_head2L,
+                pickChart.intercept_head1L,
+                pickChart.intercept_head1R,
+                pickChart.intercept_head2R,
+                pickChart.intercept_head3R
+        );
+
+        try {
+            loadLayerThicknesses();
+        } catch (Exception e) {
+            showErrorAlert("Unable to load layer thicknesses", e.getMessage());
+            e.printStackTrace();
+        }
+
         shotAmount = line.getShotAmount();
         mainShotIndex = 0;
         amountLoadedShots = 1;
         updatePlot();
+    }
+
+    private void loadLayerThicknesses() throws IOException {
+
+        double[][] interpretations = line.loadAllInterpretations();
+
+        Arrays.stream(interpretations).forEach(interpretation -> {
+            int souStat = (int) interpretation[0];
+            double layer1_thickness = interpretation[1];
+            double layer2_thickness = interpretation[2];
+            double layer3_thickness = interpretation[3];
+
+            if (souStat != UNDEFINED) {
+                Station station = getStationByNumber(souStat);
+                if (souStat != UNDEFINED && station != null) {
+                    layerChart.plotLayerThickness(
+                            new double[]{layer1_thickness, layer2_thickness, layer3_thickness}, station);
+                }
+            }
+        });
+    }
+
+    private Station getStationByNumber(int souStat) {
+        for (Station station : line.getStations()) {
+            if (station.num == souStat) {
+                return station;
+            }
+        }
+        return null;
     }
 
     private void handleLineUnloaded() {
@@ -187,7 +253,9 @@ public class MainController {
         radioButton_refraction3R.setSelected(false);
 
         container_pickChart.getChildren().clear();
+        container_layerChart.getChildren().clear();
         pickChart = null;
+        layerChart = null;
     }
 
     private void setDisableLineLoadedNodes(boolean value) {
@@ -206,8 +274,7 @@ public class MainController {
             loadShots();
             plotLoadedShots();
 
-            Point2D[] points = loadLineDrawerPoints();
-            plotLineDrawerPoints(points);
+            loadLineDrawerPoints().ifPresent(this::plotLineDrawerPoints);
 
             handleToggleSymbols();
             handleToggleLines();
@@ -263,8 +330,22 @@ public class MainController {
         }
     }
 
-    private Point2D[] loadLineDrawerPoints() throws IOException {
-        return line.loadDrawPoints(mainShotIndex);
+    private Optional<Point2D[]> loadLineDrawerPoints() throws IOException {
+        for (int shotIndex = mainShotIndex; shotIndex >= 0; shotIndex--) {
+            Point2D[] drawPoints = line.loadDrawPoints(shotIndex);
+            if (isAnyPointDefined(drawPoints)) {
+                return Optional.of(drawPoints);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private boolean isAnyPointDefined(Point2D[] points) {
+        return Arrays.stream(points).anyMatch(this::isPointDefined);
+    }
+
+    private boolean isPointDefined(Point2D point) {
+        return !(point.getX() == UNDEFINED && point.getY() == UNDEFINED);
     }
 
     private void plotLineDrawerPoints(Point2D[] points) {
@@ -323,19 +404,68 @@ public class MainController {
 
             saveLineDrawerPoints();
 
+            double[] thicknesses = computeLayerThicknesses();
+            System.out.println("z1: " + thicknesses[0]);
+            System.out.println("z2: " + thicknesses[1]);
+            System.out.println("z3: " + thicknesses[2]);
+
+            plotLayerThicknesses(thicknesses);
+
+            saveLayerInterpretation(thicknesses);
+
         } catch (IOException e) {
             showErrorAlert("Cannot save plot", e.getMessage());
         }
     }
 
     private void saveMainShot() throws IOException {
-        Shot mainShot = pickChart.getMainShot();
-        line.saveShot(mainShot, mainShotIndex);
+        line.saveShot(pickChart.getMainShot(), mainShotIndex);
     }
 
     private void saveLineDrawerPoints() throws IOException {
         Point2D[] drawPoints = pickChart.getDrawPoints();
         line.saveDrawPoints(drawPoints, mainShotIndex);
+    }
+
+    private double[] computeLayerThicknesses() {
+        return layerThicknessCalculator.computeAvailableLayersThicknesses();
+    }
+
+    private void plotLayerThicknesses(double[] thicknesses) {
+        layerChart.plotLayerThickness(thicknesses, mainShot.getStation());
+    }
+
+    private void saveLayerInterpretation(double[] thicknesses) throws IOException {
+        double[] interpretation = new double[24];
+
+        interpretation[0] = mainShot.souStat;
+
+        interpretation[1] = thicknesses[0];
+        interpretation[2] = thicknesses[1];
+        interpretation[3] = thicknesses[2];
+
+        interpretation[4] = pickChart.slope_head3L.get();
+        interpretation[5] = pickChart.slope_head2L.get();
+        interpretation[6] = pickChart.slope_head1L.get();
+        interpretation[7] = pickChart.slope_directL.get();
+        interpretation[8] = pickChart.slope_directR.get();
+        interpretation[9] = pickChart.slope_head1R.get();
+        interpretation[10] = pickChart.slope_head2R.get();
+        interpretation[11] = pickChart.slope_head3R.get();
+        interpretation[12] = pickChart.intercept_head3L.get();
+        interpretation[13] = pickChart.intercept_head2L.get();
+        interpretation[14] = pickChart.intercept_head1L.get();
+        interpretation[15] = pickChart.intercept_head1R.get();
+        interpretation[16] = pickChart.intercept_head2R.get();
+        interpretation[17] = pickChart.intercept_head3R.get();
+        interpretation[18] = pickChart.intersection_head3L_head2L.getIntersection().getX();
+        interpretation[19] = pickChart.intersection_head2L_head1L.getIntersection().getX();
+        interpretation[20] = pickChart.intersection_head1L_directL.getIntersection().getX();
+        interpretation[21] = pickChart.intersection_directR_head1R.getIntersection().getX();
+        interpretation[22] = pickChart.intersection_head1R_head2R.getIntersection().getX();
+        interpretation[23] = pickChart.intersection_head2R_head3R.getIntersection().getX();
+
+        line.saveLayerInterpretation(interpretation, mainShotIndex);
     }
 
     private void showErrorAlert(String headerText, String contentText) {

@@ -13,11 +13,12 @@ import java.util.Arrays;
 
 public final class LayerChart {
 
+    private static final double UNDEFINED = 0;
     private final ObservableList<XYChart.Data<Number, Number>> interface1;
     private final ObservableList<XYChart.Data<Number, Number>> interface2;
     private final ObservableList<XYChart.Data<Number, Number>> interface3;
 
-    public LayerChart(StackPane chartPane, Station[] stations) {
+    public LayerChart(Station[] stations, StackPane chartPane) {
 
         final ObservableList<XYChart.Data<Number, Number>> surface = FXCollections.observableArrayList();
         this.interface1 = FXCollections.observableArrayList();
@@ -38,6 +39,8 @@ public final class LayerChart {
         chart.setAnimated(false);
         chart.setCreateSymbols(false);
 
+        chartPane.getChildren().add(chart);
+
         // Interface series
         XYChart.Series<Number, Number> series_surface = new XYChart.Series<>("Surface", surface);
         XYChart.Series<Number, Number> series_interface1 = new XYChart.Series<>("Interface 1", interface1);
@@ -49,5 +52,39 @@ public final class LayerChart {
         chart.getData().add(series_interface2);
         chart.getData().add(series_interface3);
     }
+
+    public void plotLayerThickness(double[] thicknesses, Station station) {
+
+        int statNum = station.num;
+        double offset = station.x;
+        double surface_elev = station.elev;
+
+        double layer1_thickness = thicknesses[0];
+        double layer2_thickness = thicknesses[1];
+        double layer3_thickness = thicknesses[2];
+
+        if (layer1_thickness != UNDEFINED) {
+            double interface1_elev = surface_elev - layer1_thickness;
+            double interface2_elev = interface1_elev - layer2_thickness;
+            double interface3_elev = interface2_elev - layer3_thickness;
+
+            clearStationInterfaceData(statNum);
+            interface1.add(new XYChart.Data<>(offset, interface1_elev, statNum));
+            interface2.add(new XYChart.Data<>(offset, interface2_elev, statNum));
+            interface3.add(new XYChart.Data<>(offset, interface3_elev, statNum));
+        }
+    }
+
+    /**
+     * Removes all interface data of the station that has the given station number
+     *
+     * @param statNum station number
+     */
+    private void clearStationInterfaceData(int statNum) {
+        interface1.removeIf(data -> (int) data.getExtraValue() == statNum);
+        interface2.removeIf(data -> (int) data.getExtraValue() == statNum);
+        interface3.removeIf(data -> (int) data.getExtraValue() == statNum);
+    }
+
 
 }

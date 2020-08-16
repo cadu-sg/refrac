@@ -12,7 +12,7 @@ import java.nio.file.StandardOpenOption;
 
 public class DrawPointsBin {
 
-    private static final int SHOTAMOUNT_SIZE = 4;
+    private static final int SHOT_AMOUNT_SIZE = 4;
     // v3L.p1, v3L.p2, v2L.p1, v2L.p2, v1L.p1, v1L.p2, vDL.p2
     // vDL.p2, v1R.p1, v1R.p2, v2R.p1, v2R.p2, v3R.p1, v3R.p2
     private static final int POINTS_AMOUNT = 14;
@@ -30,7 +30,7 @@ public class DrawPointsBin {
     public static DrawPointsBin create(Path drawingsPath, int shotAmount) throws IOException {
         try (SeekableByteChannel byteChannel = Files.newByteChannel(drawingsPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
             // Write shotAmount to the start of the file
-            ByteBuffer shotAmountBuffer = ByteBuffer.allocate(SHOTAMOUNT_SIZE).putInt(shotAmount);
+            ByteBuffer shotAmountBuffer = ByteBuffer.allocate(SHOT_AMOUNT_SIZE).putInt(shotAmount);
             shotAmountBuffer.rewind();
             byteChannel.write(shotAmountBuffer);
             // Allocate space for all points
@@ -43,7 +43,7 @@ public class DrawPointsBin {
         // Read shotAmount from the start of the file
         int shotAmount;
         try (SeekableByteChannel byteChannel = Files.newByteChannel(drawingPointsPath)) {
-            ByteBuffer byteBuffer = ByteBuffer.allocate(SHOTAMOUNT_SIZE);
+            ByteBuffer byteBuffer = ByteBuffer.allocate(SHOT_AMOUNT_SIZE);
             byteChannel.read(byteBuffer);
             shotAmount = byteBuffer.getInt(0);
         } catch (NoSuchFileException e) {
@@ -51,7 +51,7 @@ public class DrawPointsBin {
         } catch (IOException e) {
             throw new IOException("Cannot read draw_points.bin: an IO exception occurred", e);
         }
-        if (Files.size(drawingPointsPath) != SHOTAMOUNT_SIZE + POINTS_GROUP_SIZE * shotAmount) {
+        if (Files.size(drawingPointsPath) != SHOT_AMOUNT_SIZE + POINTS_GROUP_SIZE * shotAmount) {
             throw new IllegalArgumentException("Cannot open points file: invalid file");
         }
         return new DrawPointsBin(drawingPointsPath, shotAmount);
@@ -65,14 +65,14 @@ public class DrawPointsBin {
             throw new IllegalArgumentException("Cannot save points: illegal shot index");
         }
         try (SeekableByteChannel byteChannel = Files.newByteChannel(drawingPointsPath, StandardOpenOption.WRITE)
-                .position(SHOTAMOUNT_SIZE + POINTS_GROUP_SIZE * shotIndex)) {
+                .position(SHOT_AMOUNT_SIZE + POINTS_GROUP_SIZE * shotIndex)) {
             byteChannel.write(pointsToBytes(points));
         }
     }
 
     public Point2D[] load(int shotIndex) throws IOException {
         try (SeekableByteChannel byteChannel = Files.newByteChannel(drawingPointsPath)
-                .position(SHOTAMOUNT_SIZE + POINTS_GROUP_SIZE * shotIndex)) {
+                .position(SHOT_AMOUNT_SIZE + POINTS_GROUP_SIZE * shotIndex)) {
             ByteBuffer byteBuffer = ByteBuffer.allocate(POINTS_GROUP_SIZE);
             byteChannel.read(byteBuffer);
             return bytesToPoints(byteBuffer);

@@ -87,6 +87,13 @@
                </children>
             </VBox>
             <Separator orientation="VERTICAL" />
+            <VBox>
+               <children>
+                  <Label text="Coordinates" />
+                  <Label />
+               </children>
+            </VBox>
+            <Separator orientation="VERTICAL" />
             <Label text="Seq. number" />
             <TextField fx:id="textField_seqNum" onAction="#onGoToShot" prefWidth="40.0" />
             <Button mnemonicParsing="false" onAction="#onGoToShot" text="Go" />
@@ -161,10 +168,10 @@
                                  </rowConstraints>
                                  <children>
                                     <Label text="Wave / Side" />
-                                    <Label text="Direct" GridPane.rowIndex="1" />
-                                    <Label text="Refracted 1" GridPane.rowIndex="2" />
-                                    <Label text="Refracted 2" GridPane.rowIndex="3" />
-                                    <Label text="Refracted 3" GridPane.rowIndex="4" />
+                                    <Label text="Direct" textFill="#f3622d" GridPane.rowIndex="1" />
+                                    <Label text="Refracted 1" textFill="#fba71b" GridPane.rowIndex="2" />
+                                    <Label text="Refracted 2" textFill="#57b757" GridPane.rowIndex="3" />
+                                    <Label text="Refracted 3" textFill="#41a9c9" GridPane.rowIndex="4" />
                                     <Label text="Left" GridPane.columnIndex="1" />
                                     <Label text="Right" GridPane.columnIndex="2" />
                                     <RadioButton fx:id="radioButton_directL" style="-fx-padding: 0 -6 0 0;" GridPane.columnIndex="1" GridPane.rowIndex="1" />
@@ -197,7 +204,7 @@
             <SplitPane dividerPositions="0.5" orientation="VERTICAL">
                <items>
                   <StackPane fx:id="container_pickChart" />
-                  <StackPane />
+                  <StackPane fx:id="container_layerChart" />
                </items>
             </SplitPane>
          </items>

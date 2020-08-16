@@ -25,6 +25,7 @@ public final class Line {
     private final PicksTxt picksTxt;
     private final PicksBin picksBin;
     private final DrawPointsBin drawPointsBin;
+    private final InterpretationsCSV interpretationsCSV;
 
     public int getShotAmount() {
         return picksTxt.getShotAmount();
@@ -54,12 +55,21 @@ public final class Line {
         return drawPointsBin.load(shotIndex);
     }
 
+    public void saveLayerInterpretation(double[] interpretation, int shotIndex) throws IOException {
+        interpretationsCSV.saveInterpretation(interpretation, shotIndex);
 
-    private Line(Path homeDir, PicksTxt picksTxt, PicksBin picksBin, DrawPointsBin drawPointsBin) {
+    }
+
+    public double[][] loadAllInterpretations() throws IOException {
+        return interpretationsCSV.loadAllInterpretations();
+    }
+
+    private Line(Path homeDir, PicksTxt picksTxt, PicksBin picksBin, DrawPointsBin drawPointsBin, InterpretationsCSV interpretationsCSV) {
         this.homeDir = homeDir;
         this.picksTxt = picksTxt;
         this.picksBin = picksBin;
         this.drawPointsBin = drawPointsBin;
+        this.interpretationsCSV = interpretationsCSV;
     }
 
     public static Line create(Path homeDir, Path picksFile) throws IOException, IllegalArgumentException {
@@ -89,9 +99,10 @@ public final class Line {
                 Paths.get(homeDir.toString(), "draw_points.bin"), shotAmount);
 
         // Interpretations CSV file
-//        Path interpretationsPath = Paths.get(homeDir.toString(), "interpretations.csv");
+        InterpretationsCSV interpretationsCSV = new InterpretationsCSV(
+                Paths.get(homeDir.toString(), "interpretations.csv"), shotAmount);
 
-        return new Line(homeDir, picksTxt, picksBin, drawPointsBin);
+        return new Line(homeDir, picksTxt, picksBin, drawPointsBin, interpretationsCSV);
     }
 
     public static Line open(Path homeDir) throws IOException, IllegalArgumentException {
@@ -105,7 +116,11 @@ public final class Line {
         DrawPointsBin drawPointsBin = DrawPointsBin.open(
                 Paths.get(homeDir.toString(), "draw_points.bin"));
 
-        return new Line(homeDir, picksTxt, picksBin, drawPointsBin);
+        int shotAmount = picksTxt.getShotAmount();
+        InterpretationsCSV interpretationsCSV = new InterpretationsCSV(
+                Paths.get(homeDir.toString(), "interpretations.csv"), shotAmount);
+
+        return new Line(homeDir, picksTxt, picksBin, drawPointsBin, interpretationsCSV);
     }
 
 

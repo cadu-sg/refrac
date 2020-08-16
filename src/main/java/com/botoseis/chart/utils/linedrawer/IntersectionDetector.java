@@ -6,6 +6,8 @@ import javafx.geometry.Point2D;
 
 public class IntersectionDetector {
 
+
+    private static final Point2D UNDEFINED = new Point2D(0, 0);
     private final LineDrawer lineDrawer1;
     private final LineDrawer lineDrawer2;
 
@@ -21,6 +23,9 @@ public class IntersectionDetector {
     }
 
     public Point2D getIntersection() {
+        if (intersection == null) {
+            return UNDEFINED;
+        }
         return intersection;
     }
 

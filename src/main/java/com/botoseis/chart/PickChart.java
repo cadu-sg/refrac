@@ -45,27 +45,27 @@ public final class PickChart {
     private final LineDrawer drawer_head2R;
     private final LineDrawer drawer_head3R;
 
-    private final DoubleProperty slope_head3L;
-    private final DoubleProperty slope_head2L;
-    private final DoubleProperty slope_head1L;
-    private final DoubleProperty slope_directL;
-    private final DoubleProperty slope_directR;
-    private final DoubleProperty slope_head1R;
-    private final DoubleProperty slope_head2R;
-    private final DoubleProperty slope_head3R;
-    private final DoubleProperty intercept_head3L;
-    private final DoubleProperty intercept_head2L;
-    private final DoubleProperty intercept_head1L;
-    private final DoubleProperty intercept_head1R;
-    private final DoubleProperty intercept_head2R;
-    private final DoubleProperty intercept_head3R;
+    public final DoubleProperty slope_head3L;
+    public final DoubleProperty slope_head2L;
+    public final DoubleProperty slope_head1L;
+    public final DoubleProperty slope_directL;
+    public final DoubleProperty slope_directR;
+    public final DoubleProperty slope_head1R;
+    public final DoubleProperty slope_head2R;
+    public final DoubleProperty slope_head3R;
+    public final DoubleProperty intercept_head3L;
+    public final DoubleProperty intercept_head2L;
+    public final DoubleProperty intercept_head1L;
+    public final DoubleProperty intercept_head1R;
+    public final DoubleProperty intercept_head2R;
+    public final DoubleProperty intercept_head3R;
 
-    private final IntersectionDetector intersection_head3L_head2L;
-    private final IntersectionDetector intersection_head2L_head1L;
-    private final IntersectionDetector intersection_head1L_directL;
-    private final IntersectionDetector intersection_directR_head1R;
-    private final IntersectionDetector intersection_head1R_head2R;
-    private final IntersectionDetector intersection_head2R_head3R;
+    public final IntersectionDetector intersection_head3L_head2L;
+    public final IntersectionDetector intersection_head2L_head1L;
+    public final IntersectionDetector intersection_head1L_directL;
+    public final IntersectionDetector intersection_directR_head1R;
+    public final IntersectionDetector intersection_head1R_head2R;
+    public final IntersectionDetector intersection_head2R_head3R;
 
     public PickChart(StackPane chartPane) {
         this.loadedShots = new ArrayList<>();
@@ -98,14 +98,14 @@ public final class PickChart {
         this.eraser = new Eraser(chart, chartPane, pickDataList);
 
         // Line drawers
-        drawer_head3L = new StandardLineDrawer(chart, chartPane, "magenta", 's');
-        drawer_head2L = new StandardLineDrawer(chart, chartPane, "green", 'o');
-        drawer_head1L = new StandardLineDrawer(chart, chartPane, "red", 'D');
-        drawer_directL = new OriginFixedLineDrawer(chart, chartPane, "blue", 's');
-        drawer_directR = new OriginFixedLineDrawer(chart, chartPane, "blue", 's');
-        drawer_head1R = new StandardLineDrawer(chart, chartPane, "red", 'D');
-        drawer_head2R = new StandardLineDrawer(chart, chartPane, "green", 'o');
-        drawer_head3R = new StandardLineDrawer(chart, chartPane, "magenta", 's');
+        drawer_head3L = new StandardLineDrawer(chart, chartPane, "#41A9C9", 's');
+        drawer_head2L = new StandardLineDrawer(chart, chartPane, "#57B757", 'o');
+        drawer_head1L = new StandardLineDrawer(chart, chartPane, "#FBA71B", 'D');
+        drawer_directL = new OriginFixedLineDrawer(chart, chartPane, "#F3622D", 's');
+        drawer_directR = new OriginFixedLineDrawer(chart, chartPane, "#F3622D", 's');
+        drawer_head1R = new StandardLineDrawer(chart, chartPane, "#FBA71B", 'D');
+        drawer_head2R = new StandardLineDrawer(chart, chartPane, "#57B757", 'o');
+        drawer_head3R = new StandardLineDrawer(chart, chartPane, "#41A9C9", 's');
         slope_head3L = drawer_head3L.slopeProperty();
         slope_head2L = drawer_head2L.slopeProperty();
         slope_head1L = drawer_head1L.slopeProperty();
@@ -154,7 +154,9 @@ public final class PickChart {
         clearPicks();
 
         for (Pick pick : shot.picks) {
-            pickDataList.add(new XYChart.Data<>(pick.offset, pick.travelTime, pick));
+            pickDataList.add(new XYChart.Data<>(
+                    pick.offset, pick.travelTime,
+                    new PickWithSouStat(pick, shot.souStat)));
         }
 
         loadedShots.add(shot);
@@ -166,7 +168,9 @@ public final class PickChart {
 
         for (Shot shot : shots) {
             for (Pick pick : shot.picks) {
-                pickDataList.add(new XYChart.Data<>(pick.offset, pick.travelTime, pick));
+                pickDataList.add(new XYChart.Data<>(
+                        pick.offset, pick.travelTime,
+                        new PickWithSouStat(pick, shot.souStat)));
             }
         }
 
@@ -304,7 +308,33 @@ public final class PickChart {
      * @return main shot
      */
     public Shot getMainShot() {
-        return mainShot;
+        Shot shot = new Shot();
+        shot.seqNum = mainShot.seqNum;
+        shot.souStat = mainShot.souStat;
+        shot.souX = mainShot.souX;
+        shot.souY = mainShot.souY;
+        shot.souElev = mainShot.souElev;
+
+        List<Pick> picks = new ArrayList<>();
+        pickDataList.stream()
+                .filter(data -> ((PickWithSouStat) data.getExtraValue()).souStat == mainShot.souStat)
+                .forEach(data -> picks.add(((PickWithSouStat) data.getExtraValue()).pick));
+
+        shot.pickAmount = picks.size();
+        shot.picks = picks.toArray(new Pick[0]);
+
+        return shot;
+    }
+
+    public static class PickWithSouStat {
+
+        public final Pick pick;
+        public final int souStat;
+
+        public PickWithSouStat(Pick pick, int souStat) {
+            this.pick = pick;
+            this.souStat = souStat;
+        }
     }
 
 }
