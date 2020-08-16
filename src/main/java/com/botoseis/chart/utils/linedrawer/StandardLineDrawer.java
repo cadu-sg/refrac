@@ -21,11 +21,6 @@ public final class StandardLineDrawer extends LineDrawer {
         this.mouseMovedHandler = new StandardMouseMovedHandler();
 
         this.interceptDrawer = new InterceptDrawer(chart);
-
-        System.out.println(isDrawn() ? "drawn" : "NOT drawn");
-//        drawn.addListener((observable, oldValue, newValue) -> {
-//            System.out.println(newValue ? "drawn" : "NOT drawn");
-//        });
     }
 
     private class InterceptDrawer {
@@ -113,7 +108,6 @@ public final class StandardLineDrawer extends LineDrawer {
                     disablePreviewLine();
                     chartPane.setCursor(Cursor.DEFAULT);
                     drawn.set(true);
-                    seriesLayout.setLineVisible(true);
                 }
 
             } else if (event.isSecondaryButtonDown() && !lineData.isEmpty()) {
@@ -142,7 +136,6 @@ public final class StandardLineDrawer extends LineDrawer {
                     lineData.remove(data1);
                     data1 = null;
                     disablePreviewLine();
-                    seriesLayout.setLineVisible(false);
                 }
             }
             event.consume();
@@ -169,6 +162,7 @@ public final class StandardLineDrawer extends LineDrawer {
                 }
                 dataNode.setCursor(Cursor.CLOSED_HAND);
                 drawn.set(false);
+                seriesLayout.setLineVisible(true);
             }
             event.consume();
         });

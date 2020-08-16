@@ -89,7 +89,6 @@ public final class OriginFixedLineDrawer extends LineDrawer {
                 disablePreviewLine();
                 chartPane.setCursor(Cursor.DEFAULT);
                 drawn.set(true);
-                seriesLayout.setLineVisible(true);
             } else if (event.isSecondaryButtonDown() && drawn.get()) {
                 // Remove 2nd data
                 lineData.remove(data2);
@@ -97,7 +96,6 @@ public final class OriginFixedLineDrawer extends LineDrawer {
                 enablePreviewLine(event.getX(), event.getY());
                 chartPane.setCursor(Cursor.CROSSHAIR);
                 drawn.set(false);
-                seriesLayout.setLineVisible(false);
             }
         }
     }
@@ -125,6 +123,7 @@ public final class OriginFixedLineDrawer extends LineDrawer {
         dataNode.setOnMousePressed((MouseEvent event) -> {
             if (event.isPrimaryButtonDown()) {
                 drawn.set(false);
+                seriesLayout.setLineVisible(true);
 
                 // Conversion needed because this MouseEvent's source Node is dataNode, not chartPane
                 Point2D pointRelativeToChartPane = chartPane.sceneToLocal(event.getSceneX(), event.getSceneY());

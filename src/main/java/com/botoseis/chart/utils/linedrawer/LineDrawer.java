@@ -141,10 +141,12 @@ public abstract class LineDrawer {
     protected abstract void onDisabledHandler();
 
     protected void onDrawnHandler() {
+        seriesLayout.setLineVisible(true);
         computeCoefficients();
     }
 
     protected void onErasedHandler() {
+        seriesLayout.setLineVisible(false);
         slope.set(UNDEFINED);
         intercept.set(UNDEFINED);
     }
@@ -181,12 +183,6 @@ public abstract class LineDrawer {
         enableDataMouseDragging(data1);
         SeriesLayout.setDataStyle(data1, color, "h" + shape);
     }
-
-//    public void removePoint1() {
-//        lineData.remove(data1);
-//        data1 = null;
-//        seriesLayout.setLineVisible(false);
-//    }
 
     public final void setPoint2(Point2D point) {
         setPoint2(point.getX(), point.getY());
@@ -228,10 +224,13 @@ public abstract class LineDrawer {
         }
     }
 
-    public final Pane getChartPane() {
-        return this.chartPane;
+    public final void clear() {
+        enabled.set(false);
+        drawn.set(false);
+        lineData.clear();
+        data1 = null;
+        data2 = null;
     }
-
 
     /* Dada uma coordenada nos eixos do gráfico
        obter suas cooordenadas em relação ao chartPane */

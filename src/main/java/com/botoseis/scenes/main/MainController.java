@@ -11,9 +11,11 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.geometry.Point2D;
 import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
@@ -54,6 +56,8 @@ public class MainController {
     private StackPane container_pickChart;
     @FXML
     private GridPane container_layout;
+    @FXML
+    private HBox container_saving;
 
     @FXML
     private Label label_seqNum;
@@ -134,16 +138,20 @@ public class MainController {
     }
 
     private void handleProjectLoaded() {
-        menu_line.setDisable(false);
+        setDisableProjectLoadedNodes(false);
     }
 
     private void handleProjectUnloaded() {
-        menu_line.setDisable(true);
+        setDisableProjectLoadedNodes(true);
         lineLoaded.set(false);
     }
 
+    private void setDisableProjectLoadedNodes(boolean value) {
+        menu_line.setDisable(value);
+    }
+
     private void handleLineLoaded() {
-        toggleLineLoadedContainers(true);
+        setDisableLineLoadedNodes(false);
 
         pickChart = new PickChart(container_pickChart);
         pickChart.assignToolsControllers(
@@ -164,7 +172,7 @@ public class MainController {
     }
 
     private void handleLineUnloaded() {
-        toggleLineLoadedContainers(false);
+        setDisableLineLoadedNodes(true);
 
         label_seqNum.setText("");
         label_shotStat.setText("");
@@ -182,10 +190,11 @@ public class MainController {
         pickChart = null;
     }
 
-    private void toggleLineLoadedContainers(boolean value) {
-        container_toolbar.setDisable(!value);
-        container_layout.setDisable(!value);
-        container_interpretation.setDisable(!value);
+    private void setDisableLineLoadedNodes(boolean value) {
+        container_toolbar.setDisable(value);
+        container_layout.setDisable(value);
+        container_saving.setDisable(value);
+        container_interpretation.setDisable(value);
     }
 
     /**
@@ -194,9 +203,11 @@ public class MainController {
      */
     private void updatePlot() {
         try {
-            updateLoadedShots();
-
+            loadShots();
             plotLoadedShots();
+
+            Point2D[] points = loadLineDrawerPoints();
+            plotLineDrawerPoints(points);
 
             handleToggleSymbols();
             handleToggleLines();
@@ -209,7 +220,7 @@ public class MainController {
     }
 
 
-    private void updateLoadedShots() throws IOException {
+    private void loadShots() throws IOException {
         loadedShots.clear();
         if (amountLoadedShots == 1) {
             // Loading a single shot
@@ -250,6 +261,14 @@ public class MainController {
         } else {
             pickChart.plot(loadedShots, mainShot);
         }
+    }
+
+    private Point2D[] loadLineDrawerPoints() throws IOException {
+        return line.loadDrawPoints(mainShotIndex);
+    }
+
+    private void plotLineDrawerPoints(Point2D[] points) {
+        pickChart.setDrawPoints(points);
     }
 
     private void handleToggleSymbols() {
@@ -296,6 +315,27 @@ public class MainController {
         lineColor = colorPicker_lines.getValue().toString().replaceAll("0x", "#");
         // Set updated line layout
         pickChart.getLayout().setLineStyle(lineWidth, lineColor);
+    }
+
+    private void savePlot() {
+        try {
+            saveMainShot();
+
+            saveLineDrawerPoints();
+
+        } catch (IOException e) {
+            showErrorAlert("Cannot save plot", e.getMessage());
+        }
+    }
+
+    private void saveMainShot() throws IOException {
+        Shot mainShot = pickChart.getMainShot();
+        line.saveShot(mainShot, mainShotIndex);
+    }
+
+    private void saveLineDrawerPoints() throws IOException {
+        Point2D[] drawPoints = pickChart.getDrawPoints();
+        line.saveDrawPoints(drawPoints, mainShotIndex);
     }
 
     private void showErrorAlert(String headerText, String contentText) {
@@ -471,6 +511,12 @@ public class MainController {
     @FXML
     private void onSetLineLayout(ActionEvent event) {
         handleSetLineLayout();
+        event.consume();
+    }
+
+    @FXML
+    private void onSavePlot(ActionEvent event) {
+        savePlot();
         event.consume();
     }
 

@@ -11,6 +11,7 @@ import com.botoseis.structs.Shot;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.collections.ObservableList;
+import javafx.geometry.Point2D;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.layout.StackPane;
@@ -22,6 +23,8 @@ import java.util.List;
  * PickChart provides a Chart with methods for easily plotting picks from one or more shots.
  */
 public final class PickChart {
+
+    private static final double UNDEFINED = 0;
 
     private final LineChartWithMarkers<Number, Number> chart;
     private final XYChart.Series<Number, Number> series;
@@ -148,7 +151,7 @@ public final class PickChart {
     }
 
     public void plot(Shot shot) {
-        clear();
+        clearPicks();
 
         for (Pick pick : shot.picks) {
             pickDataList.add(new XYChart.Data<>(pick.offset, pick.travelTime, pick));
@@ -159,7 +162,7 @@ public final class PickChart {
     }
 
     public void plot(List<Shot> shots, Shot mainShot) {
-        clear();
+        clearPicks();
 
         for (Shot shot : shots) {
             for (Pick pick : shot.picks) {
@@ -171,7 +174,7 @@ public final class PickChart {
         this.mainShot = mainShot;
     }
 
-    public void clear() {
+    public void clearPicks() {
         pickDataList.clear();
         loadedShots.clear();
     }
@@ -188,14 +191,14 @@ public final class PickChart {
         zoom.enabledProperty().bind(toggle_zoom);
         eraser.enabledProperty().bind(toggle_eraser);
 
-        drawer_head3L.enabledProperty().bind(toggle_head3L);
-        drawer_head2L.enabledProperty().bind(toggle_head2L);
-        drawer_head1L.enabledProperty().bind(toggle_head1L);
-        drawer_directL.enabledProperty().bind(toggle_directL);
-        drawer_directR.enabledProperty().bind(toggle_directR);
-        drawer_head1R.enabledProperty().bind(toggle_head1R);
-        drawer_head2R.enabledProperty().bind(toggle_head2R);
-        drawer_head3R.enabledProperty().bind(toggle_head3R);
+        drawer_head3L.enabledProperty().bindBidirectional(toggle_head3L);
+        drawer_head2L.enabledProperty().bindBidirectional(toggle_head2L);
+        drawer_head1L.enabledProperty().bindBidirectional(toggle_head1L);
+        drawer_directL.enabledProperty().bindBidirectional(toggle_directL);
+        drawer_directR.enabledProperty().bindBidirectional(toggle_directR);
+        drawer_head1R.enabledProperty().bindBidirectional(toggle_head1R);
+        drawer_head2R.enabledProperty().bindBidirectional(toggle_head2R);
+        drawer_head3R.enabledProperty().bindBidirectional(toggle_head3R);
 
         ensureSingleTrue(toggle_zoom, toggle_eraser,
                 toggle_head3L, toggle_head2L, toggle_head1L, toggle_directL,
@@ -215,6 +218,84 @@ public final class PickChart {
                 }
             });
         }
+    }
+
+    public Point2D[] getDrawPoints() {
+        return new Point2D[]{
+                drawer_head3L.getPoint1(),
+                drawer_head3L.getPoint2(),
+                drawer_head2L.getPoint1(),
+                drawer_head2L.getPoint2(),
+                drawer_head1L.getPoint1(),
+                drawer_head1L.getPoint2(),
+                drawer_directL.getPoint2(),
+                drawer_directR.getPoint2(),
+                drawer_head1R.getPoint1(),
+                drawer_head1R.getPoint2(),
+                drawer_head2R.getPoint1(),
+                drawer_head2R.getPoint2(),
+                drawer_head3R.getPoint1(),
+                drawer_head3R.getPoint2()};
+    }
+
+    public void setDrawPoints(Point2D[] points) {
+        clearLineDrawers();
+
+        if (isPointDefined(points[0])) {
+            drawer_head3L.setPoint1(points[0]);
+            drawer_head3L.setPoint2(points[1]);
+            drawer_head3L.drawnProperty().set(true);
+        }
+        if (isPointDefined(points[2])) {
+            drawer_head2L.setPoint1(points[2]);
+            drawer_head2L.setPoint2(points[3]);
+            drawer_head2L.drawnProperty().set(true);
+        }
+        if (isPointDefined(points[4])) {
+            drawer_head1L.setPoint1(points[4]);
+            drawer_head1L.setPoint2(points[5]);
+            drawer_head1L.drawnProperty().set(true);
+        }
+        if (isPointDefined(points[6])) {
+            drawer_directL.setPoint1(new Point2D(0, 0));
+            drawer_directL.setPoint2(points[6]);
+            drawer_directL.drawnProperty().set(true);
+        }
+        if (isPointDefined(points[7])) {
+            drawer_directR.setPoint1(new Point2D(0, 0));
+            drawer_directR.setPoint2(points[7]);
+            drawer_directR.drawnProperty().set(true);
+        }
+        if (isPointDefined(points[8])) {
+            drawer_head1R.setPoint1(points[8]);
+            drawer_head1R.setPoint2(points[9]);
+            drawer_head1R.drawnProperty().set(true);
+        }
+        if (isPointDefined(points[10])) {
+            drawer_head2R.setPoint1(points[10]);
+            drawer_head2R.setPoint2(points[11]);
+            drawer_head2R.drawnProperty().set(true);
+        }
+        if (isPointDefined(points[12])) {
+            drawer_head3R.setPoint1(points[12]);
+            drawer_head3R.setPoint2(points[13]);
+            drawer_head3R.drawnProperty().set(true);
+        }
+    }
+
+    private boolean isPointDefined(javafx.geometry.Point2D point) {
+        return !(point.getX() == UNDEFINED && point.getY() == UNDEFINED);
+    }
+
+    public void clearLineDrawers() {
+        drawer_head3L.clear();
+        drawer_head2L.clear();
+        drawer_head1L.clear();
+        drawer_directL.clear();
+        drawer_directR.clear();
+        drawer_head1R.clear();
+        drawer_head2R.clear();
+        drawer_head3R.clear();
     }
 
     /**

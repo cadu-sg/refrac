@@ -105,6 +105,11 @@
                <content>
                   <VBox>
                      <children>
+                        <HBox fx:id="container_saving" disable="true">
+                           <children>
+                              <Button mnemonicParsing="false" onAction="#onSavePlot" text="Save plot" />
+                           </children>
+                        </HBox>
                         <TitledPane text="Layout">
                            <content>
                               <GridPane fx:id="container_layout" disable="true">
