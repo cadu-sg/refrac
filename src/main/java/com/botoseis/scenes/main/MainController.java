@@ -73,6 +73,8 @@ public class MainController {
     private Label label_seqNum;
     @FXML
     private Label label_shotStat;
+    @FXML
+    private Label label_shotCoordinates;
 
     @FXML
     private TextField textField_seqNum;
@@ -242,6 +244,7 @@ public class MainController {
 
         label_seqNum.setText("");
         label_shotStat.setText("");
+        label_shotCoordinates.setText("");
 
         radioButton_refraction3L.setSelected(false);
         radioButton_refraction2L.setSelected(false);
@@ -314,6 +317,8 @@ public class MainController {
             label_shotStat.setText(loadedShots.get(0).souStat + "to"
                     + loadedShots.get(loadedShots.size() - 1).souStat);
         }
+        label_shotCoordinates.setText(String.format("(%.2f, %.2f)", mainShot.souX, mainShot.souY));
+
         // Update text fields
         textField_seqNum.setText(String.valueOf(mainShotIndex + 1));
         textField_amountLoadedShots.setText(String.valueOf(amountLoadedShots));

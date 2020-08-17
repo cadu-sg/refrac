@@ -87,10 +87,10 @@
                </children>
             </VBox>
             <Separator orientation="VERTICAL" />
-            <VBox>
+            <VBox alignment="CENTER">
                <children>
                   <Label text="Coordinates" />
-                  <Label />
+                  <Label fx:id="label_shotCoordinates" />
                </children>
             </VBox>
             <Separator orientation="VERTICAL" />
