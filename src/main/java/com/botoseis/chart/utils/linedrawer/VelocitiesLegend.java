@@ -56,6 +56,7 @@ public final class VelocitiesLegend {
                             DoubleProperty slope_head3L, DoubleProperty slope_head2L, DoubleProperty slope_head1L, DoubleProperty slope_directL,
                             DoubleProperty slope_directR, DoubleProperty slope_head1R, DoubleProperty slope_head2R, DoubleProperty slope_head3R) {
 
+        // Labels
         Label label_vD = new Label("Direct");
         Label label_v1 = new Label("Refracted 1");
         Label label_v2 = new Label("Refracted 2");
@@ -72,6 +73,23 @@ public final class VelocitiesLegend {
         Label label_v1R = new Label();
         Label label_v2R = new Label();
         Label label_v3R = new Label();
+
+        Label label_average = new Label("Average");
+        Label label_vDA = new Label();
+        Label label_v1A = new Label();
+        Label label_v2A = new Label();
+        Label label_v3A = new Label();
+
+        GridPane grid = new GridPane();
+        grid.setHgap(9);
+        grid.setVgap(3);
+        grid.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        grid.setStyle(
+                "-fx-background-color: rgba(135, 206, 250, 0.7);"
+                        + "-fx-background-radius: 3;"
+                        + "-fx-padding: 10;"
+                        + "-fx-background-insets: 5;");
+        grid.setMouseTransparent(true);
 
         v3L = getVelocityProperty(slope_head3L);
         v2L = getVelocityProperty(slope_head2L);
@@ -91,67 +109,33 @@ public final class VelocitiesLegend {
         v2R.addListener((observable, oldValue, newValue) -> label_v2R.setText(computeVelocityText(newValue.doubleValue())));
         v3R.addListener((observable, oldValue, newValue) -> label_v3R.setText(computeVelocityText(newValue.doubleValue())));
 
-        GridPane.setColumnIndex(label_vD, 0);
-        GridPane.setRowIndex(label_vD, 1);
-        GridPane.setColumnIndex(label_v1, 0);
-        GridPane.setRowIndex(label_v1, 2);
-        GridPane.setColumnIndex(label_v2, 0);
-        GridPane.setRowIndex(label_v2, 3);
-        GridPane.setColumnIndex(label_v3, 0);
-        GridPane.setRowIndex(label_v3, 4);
+        // Populate grid
+        grid.add(label_vD, 0, 1);
+        grid.add(label_v1, 0, 2);
+        grid.add(label_v2, 0, 3);
+        grid.add(label_v3, 0, 4);
 
-        GridPane.setColumnIndex(label_left, 1);
-        GridPane.setRowIndex(label_left, 0);
-        GridPane.setColumnIndex(label_vDL, 1);
-        GridPane.setRowIndex(label_vDL, 1);
-        GridPane.setColumnIndex(label_v1L, 1);
-        GridPane.setRowIndex(label_v1L, 2);
-        GridPane.setColumnIndex(label_v2L, 1);
-        GridPane.setRowIndex(label_v2L, 3);
-        GridPane.setColumnIndex(label_v3L, 1);
-        GridPane.setRowIndex(label_v3L, 4);
+        grid.add(label_left, 1, 0);
+        grid.add(label_vDL, 1, 1);
+        grid.add(label_v1L, 1, 2);
+        grid.add(label_v2L, 1, 3);
+        grid.add(label_v3L, 1, 4);
 
-        GridPane.setColumnIndex(label_right, 2);
-        GridPane.setRowIndex(label_right, 0);
-        GridPane.setColumnIndex(label_vDR, 2);
-        GridPane.setRowIndex(label_vDR, 1);
-        GridPane.setColumnIndex(label_v1R, 2);
-        GridPane.setRowIndex(label_v1R, 2);
-        GridPane.setColumnIndex(label_v2R, 2);
-        GridPane.setRowIndex(label_v2R, 3);
-        GridPane.setColumnIndex(label_v3R, 2);
-        GridPane.setRowIndex(label_v3R, 4);
+        grid.add(label_right, 2, 0);
+        grid.add(label_vDR, 2, 1);
+        grid.add(label_v1R, 2, 2);
+        grid.add(label_v2R, 2, 3);
+        grid.add(label_v3R, 2, 4);
 
-        ColumnConstraints[] columns = new ColumnConstraints[3];
-        columns[0] = new ColumnConstraints(90);
-        columns[1] = new ColumnConstraints(60);
-        columns[1].setHalignment(HPos.CENTER);
-        columns[2] = new ColumnConstraints(60);
-        columns[2].setHalignment(HPos.CENTER);
-        RowConstraints[] rows = new RowConstraints[5];
-        rows[0] = new RowConstraints(20);
-        rows[1] = new RowConstraints(20);
-        rows[2] = new RowConstraints(20);
-        rows[3] = new RowConstraints(20);
-        rows[4] = new RowConstraints(20);
+        grid.add(label_average, 3, 0);
+        grid.add(label_vDA, 3, 1);
+        grid.add(label_v1A, 3, 2);
+        grid.add(label_v2A, 3, 3);
+        grid.add(label_v3A, 3, 4);
 
-        GridPane container_legend = new GridPane();
-        container_legend.getColumnConstraints().addAll(columns);
-        container_legend.getRowConstraints().addAll(rows);
-        container_legend.getChildren().addAll(
-                label_vD, label_v1, label_v2, label_v3,
-                label_left, label_vDL, label_v1L, label_v2L, label_v3L,
-                label_right, label_vDR, label_v1R, label_v2R, label_v3R);
-        container_legend.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
-        container_legend.setStyle(
-                "-fx-background-color: rgba(135, 206, 250, 0.7);"
-                        + "-fx-background-radius: 3;"
-                        + "-fx-padding: 10;"
-                        + "-fx-background-insets: 5;");
-        container_legend.setMouseTransparent(true);
-        StackPane.setAlignment(container_legend, Pos.TOP_CENTER);
-
-        chartPane.getChildren().add(container_legend);
+        // Add grid to chartPane
+        StackPane.setAlignment(grid, Pos.TOP_CENTER);
+        chartPane.getChildren().add(grid);
     }
 
     private String computeVelocityText(double velocity) {
@@ -160,6 +144,18 @@ public final class VelocitiesLegend {
         } else {
             return String.format("%.2f", velocity);
         }
+    }
+
+    private String computeAverageVelocityText(double slope1, double slope2) {
+        if (slope1 == UNDEFINED || slope2 == UNDEFINED) {
+            return "";
+        } else {
+            return String.format("%.2f", computeAverageVelocity(slope1, slope2));
+        }
+    }
+
+    private double computeAverageVelocity(double slope1, double slope2) {
+        return 2000 / (slope1 + slope2);
     }
 
     private DoubleProperty getVelocityProperty(DoubleProperty slope) {
