@@ -410,10 +410,6 @@ public class MainController {
             saveLineDrawerPoints();
 
             double[] thicknesses = computeLayerThicknesses();
-            System.out.println("z1: " + thicknesses[0]);
-            System.out.println("z2: " + thicknesses[1]);
-            System.out.println("z3: " + thicknesses[2]);
-
             plotLayerThicknesses(thicknesses);
 
             saveLayerInterpretation(thicknesses);
@@ -437,7 +433,11 @@ public class MainController {
     }
 
     private void plotLayerThicknesses(double[] thicknesses) {
-        layerChart.plotLayerThickness(thicknesses, mainShot.getStation());
+        if (Arrays.stream(thicknesses).anyMatch(Double::isNaN)) {
+            showErrorAlert("Cannot compute layer thickness", "There is an incoherent interpretation");
+        } else {
+            layerChart.plotLayerThickness(thicknesses, mainShot.getStation());
+        }
     }
 
     private void saveLayerInterpretation(double[] thicknesses) throws IOException {
