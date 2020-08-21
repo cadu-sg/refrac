@@ -1,56 +1,15 @@
 package com.botoseis.chart.utils.linedrawer;
 
 import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.geometry.HPos;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
-import javafx.scene.layout.*;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 
 public final class VelocitiesLegend {
 
     private static final double UNDEFINED = 0;
-
-    private final DoubleProperty v3L;
-    private final DoubleProperty v2L;
-    private final DoubleProperty v1L;
-    private final DoubleProperty v0L;
-    private final DoubleProperty v0R;
-    private final DoubleProperty v1R;
-    private final DoubleProperty v2R;
-    private final DoubleProperty v3R;
-
-    public DoubleProperty v3LProperty() {
-        return v3L;
-    }
-
-    public DoubleProperty v2LProperty() {
-        return v2L;
-    }
-
-    public DoubleProperty v1LProperty() {
-        return v1L;
-    }
-
-    public DoubleProperty v0LProperty() {
-        return v0L;
-    }
-
-    public DoubleProperty v0RProperty() {
-        return v0R;
-    }
-
-    public DoubleProperty v1RProperty() {
-        return v1R;
-    }
-
-    public DoubleProperty v2RProperty() {
-        return v2R;
-    }
-
-    public DoubleProperty v3RProperty() {
-        return v3R;
-    }
 
     public VelocitiesLegend(StackPane chartPane,
                             DoubleProperty slope_head3L, DoubleProperty slope_head2L, DoubleProperty slope_head1L, DoubleProperty slope_directL,
@@ -81,8 +40,8 @@ public final class VelocitiesLegend {
         Label label_v3A = new Label();
 
         GridPane grid = new GridPane();
-        grid.setHgap(9);
-        grid.setVgap(3);
+        grid.setHgap(10);
+        grid.setVgap(5);
         grid.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
         grid.setStyle(
                 "-fx-background-color: rgba(135, 206, 250, 0.7);"
@@ -91,23 +50,41 @@ public final class VelocitiesLegend {
                         + "-fx-background-insets: 5;");
         grid.setMouseTransparent(true);
 
-        v3L = getVelocityProperty(slope_head3L);
-        v2L = getVelocityProperty(slope_head2L);
-        v1L = getVelocityProperty(slope_head1L);
-        v0L = getVelocityProperty(slope_directL);
-        v0R = getVelocityProperty(slope_directR);
-        v1R = getVelocityProperty(slope_head1R);
-        v2R = getVelocityProperty(slope_head2R);
-        v3R = getVelocityProperty(slope_head3R);
+        slope_head3L.addListener((observable, oldValue, newValue) -> {
 
-        v3L.addListener((observable, oldValue, newValue) -> label_v3L.setText(computeVelocityText(newValue.doubleValue())));
-        v2L.addListener((observable, oldValue, newValue) -> label_v2L.setText(computeVelocityText(newValue.doubleValue())));
-        v1L.addListener((observable, oldValue, newValue) -> label_v1L.setText(computeVelocityText(newValue.doubleValue())));
-        v0L.addListener((observable, oldValue, newValue) -> label_vDL.setText(computeVelocityText(newValue.doubleValue())));
-        v0R.addListener((observable, oldValue, newValue) -> label_vDR.setText(computeVelocityText(newValue.doubleValue())));
-        v1R.addListener((observable, oldValue, newValue) -> label_v1R.setText(computeVelocityText(newValue.doubleValue())));
-        v2R.addListener((observable, oldValue, newValue) -> label_v2R.setText(computeVelocityText(newValue.doubleValue())));
-        v3R.addListener((observable, oldValue, newValue) -> label_v3R.setText(computeVelocityText(newValue.doubleValue())));
+            label_v3L.setText(computeVelocityText(newValue.doubleValue()));
+
+            label_v3A.setText(computeAverageVelocityText(newValue.doubleValue(), slope_head3R.get()));
+
+        });
+        slope_head2L.addListener((observable, oldValue, newValue) -> {
+            label_v2L.setText(computeVelocityText(newValue.doubleValue()));
+            label_v2A.setText(computeAverageVelocityText(newValue.doubleValue(), slope_head2R.get()));
+        });
+        slope_head1L.addListener((observable, oldValue, newValue) -> {
+            label_v1L.setText(computeVelocityText(newValue.doubleValue()));
+            label_v1A.setText(computeAverageVelocityText(newValue.doubleValue(), slope_head1R.get()));
+        });
+        slope_directL.addListener((observable, oldValue, newValue) -> {
+            label_vDL.setText(computeVelocityText(newValue.doubleValue()));
+            label_vDA.setText(computeAverageVelocityText(newValue.doubleValue(), slope_directR.get()));
+        });
+        slope_directR.addListener((observable, oldValue, newValue) -> {
+            label_vDR.setText(computeVelocityText(newValue.doubleValue()));
+            label_vDA.setText(computeAverageVelocityText(newValue.doubleValue(), slope_directL.get()));
+        });
+        slope_head1R.addListener((observable, oldValue, newValue) -> {
+            label_v1R.setText(computeVelocityText(newValue.doubleValue()));
+            label_v1A.setText(computeAverageVelocityText(newValue.doubleValue(), slope_head1L.get()));
+        });
+        slope_head2R.addListener((observable, oldValue, newValue) -> {
+            label_v2R.setText(computeVelocityText(newValue.doubleValue()));
+            label_v2A.setText(computeAverageVelocityText(newValue.doubleValue(), slope_head2L.get()));
+        });
+        slope_head3R.addListener((observable, oldValue, newValue) -> {
+            label_v3R.setText(computeVelocityText(newValue.doubleValue()));
+            label_v3A.setText(computeAverageVelocityText(newValue.doubleValue(), slope_head3L.get()));
+        });
 
         // Populate grid
         grid.add(label_vD, 0, 1);
@@ -138,12 +115,16 @@ public final class VelocitiesLegend {
         chartPane.getChildren().add(grid);
     }
 
-    private String computeVelocityText(double velocity) {
-        if (velocity == UNDEFINED) {
+    private String computeVelocityText(double slope) {
+        if (slope == UNDEFINED) {
             return "";
         } else {
-            return String.format("%.2f", velocity);
+            return String.format("%.2f", computeVelocity(slope));
         }
+    }
+
+    private double computeVelocity(double slope) {
+        return Math.abs(1000 / slope);
     }
 
     private String computeAverageVelocityText(double slope1, double slope2) {
@@ -155,21 +136,7 @@ public final class VelocitiesLegend {
     }
 
     private double computeAverageVelocity(double slope1, double slope2) {
-        return 2000 / (slope1 + slope2);
-    }
-
-    private DoubleProperty getVelocityProperty(DoubleProperty slope) {
-        DoubleProperty velocity = new SimpleDoubleProperty(UNDEFINED);
-        slope.addListener((observable, oldValue, newValue) -> velocity.set(computeVelocity(newValue.doubleValue())));
-        return velocity;
-    }
-
-    private double computeVelocity(double slope) {
-        if (slope == UNDEFINED) {
-            return UNDEFINED;
-        } else {
-            return Math.abs(1000 / slope);
-        }
+        return 2000 / (Math.abs(slope1) + Math.abs(slope2));
     }
 
 }
