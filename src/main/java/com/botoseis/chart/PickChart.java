@@ -4,6 +4,7 @@ import com.botoseis.chart.utils.Eraser;
 import com.botoseis.chart.utils.SeriesLayout;
 import com.botoseis.chart.utils.Zoom;
 import com.botoseis.chart.utils.linedrawer.*;
+import com.botoseis.chart.utils.linedrawer.fit.LineFit;
 import com.botoseis.chart.utils.marker.LineChartWithMarkers;
 import com.botoseis.chart.utils.marker.VerticalMarkerGenerator;
 import com.botoseis.structs.Pick;
@@ -15,6 +16,7 @@ import javafx.geometry.Point2D;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -67,7 +69,7 @@ public final class PickChart {
     public final IntersectionDetector intersection_head1R_head2R;
     public final IntersectionDetector intersection_head2R_head3R;
 
-    public PickChart(StackPane chartPane) {
+    public PickChart(StackPane chartPane, VBox lineFitContainer) {
         this.loadedShots = new ArrayList<>();
 
         // Series and Data
@@ -148,6 +150,7 @@ public final class PickChart {
         new VerticalMarkerGenerator(chart, intersection_head1R_head2R);
         new VerticalMarkerGenerator(chart, intersection_head2R_head3R);
 
+        LineFit fit_head1R = new LineFit(drawer_head1R, pickDataList, intersection_head1R_head2R, lineFitContainer);
     }
 
     public void plot(Shot shot) {

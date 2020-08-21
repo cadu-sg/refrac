@@ -20,6 +20,7 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
 
@@ -101,7 +102,7 @@ public class MainController {
     private ToggleButton toggleButton_eraser;
 
     @FXML
-    private GridPane container_interpretation;
+    private VBox container_interpretation;
     @FXML
     private RadioButton radioButton_refraction3L;
     @FXML
@@ -165,7 +166,7 @@ public class MainController {
     private void handleLineLoaded() {
         setDisableLineLoadedNodes(false);
 
-        pickChart = new PickChart(container_pickChart);
+        pickChart = new PickChart(container_pickChart, container_interpretation);
 
         pickChart.assignToolsControllers(
                 toggleButton_zoom.selectedProperty(), toggleButton_eraser.selectedProperty(),
