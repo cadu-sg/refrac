@@ -1,40 +1,32 @@
 package com.botoseis.chart.utils.linedrawer.fit;
 
-import com.botoseis.chart.utils.linedrawer.IntersectionDetector;
 import com.botoseis.chart.utils.linedrawer.LineDrawer;
-import com.botoseis.chart.utils.linedrawer.OriginFixedLineDrawer;
-import com.botoseis.chart.utils.linedrawer.StandardLineDrawer;
 import com.botoseis.math.LinearRegression;
 import javafx.collections.ObservableList;
-import javafx.geometry.Pos;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.layout.Pane;
-import javafx.scene.layout.VBox;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class LineFit {
+abstract class LineFit {
 
-    private Pane lineFitParent;
+    protected static final double[] UNDEFINED = new double[]{0, 0};
 
     private final LineDrawer lineDrawer;
     private final ObservableList<XYChart.Data<Number, Number>> dataList;
-    private final IntersectionDetector intersection;
     private final Pane lineFitNodeContainer;
     private final LineFitNode lineFitNode;
 
-    public LineFit(LineDrawer lineDrawer,
-                   ObservableList<XYChart.Data<Number, Number>> dataList,
-                   IntersectionDetector intersection,
-                   Pane lineFitNodeContainer) {
+    protected LineFit(LineDrawer lineDrawer,
+                      ObservableList<XYChart.Data<Number, Number>> dataList,
+                      Pane lineFitNodeContainer,
+                      String text) {
         this.lineDrawer = lineDrawer;
-        this.intersection = intersection;
         this.dataList = dataList;
         this.lineFitNodeContainer = lineFitNodeContainer;
-        lineFitNode = new LineFitNode();
+        this.lineFitNode = new LineFitNode(text);
         lineDrawer.drawnProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue) {
                 addGUI();
@@ -52,20 +44,54 @@ public class LineFit {
         this.lineFitNodeContainer.getChildren().add(lineFitNode);
     }
 
-    private class LineFitNode extends VBox {
-        public LineFitNode() {
-            Label label = new Label("Adjust selected line drawer");
-            Button button = new Button("Adjust");
-//            button.setOnAction(event -> {
-//                handleButton();
-//                event.consume();
-//            });
-            this.getChildren().addAll(label, button);
-            this.setAlignment(Pos.CENTER);
+    private class LineFitNode extends Button {
+        public LineFitNode(String text) {
+            this.setMaxWidth(Double.MAX_VALUE);
+            this.setText(text);
+            this.setStyle("-fx-text-fill: " + lineDrawer.getColor() + ";");
+            this.setOnAction(event -> {
+                handleFit();
+                event.consume();
+            });
         }
     }
 
-    private static double[] getSlopeIntercept(List<XYChart.Data<Number, Number>> dataList, double startX, double endX) {
+    protected final void handleFit() {
+        double[] lineFitBounds = computeLineFitBounds();
+        double startX = lineFitBounds[0];
+        double endX = lineFitBounds[1];
+
+        double[] slopeAndIntercept = computeLinearRegression(startX, endX);
+        if (slopeAndIntercept != UNDEFINED) {
+            double slope = slopeAndIntercept[0];
+            double intercept = slopeAndIntercept[1];
+            fitLineDrawer(slope, intercept);
+        }
+    }
+
+    protected abstract double[] computeLineFitBounds();
+
+    protected static double nearestZero(double value1, double value2) {
+        if (Math.abs(value1) < Math.abs(value2)) {
+            return value1;
+        } else {
+            return value2;
+        }
+    }
+
+    protected static double farthestFromFirstValue(double value1, double value2, double value3) {
+        double absValue1 = Math.abs(value1);
+        double absValue2 = Math.abs(value2);
+        double absValue3 = Math.abs(value3);
+        if (Math.abs(absValue1 - absValue2) > Math.abs(absValue1 - absValue3)) {
+            return value2;
+        } else {
+            return value3;
+        }
+    }
+
+
+    protected double[] computeLinearRegression(double startX, double endX) {
         if (startX > endX) {
             double swap = startX;
             startX = endX;
@@ -73,10 +99,13 @@ public class LineFit {
         }
         double finalStartX = startX;
         double finalEndX = endX;
-        LinearRegression.LeastSquares adjustment = new LinearRegression.LeastSquares(dataList.stream()
+        List<XYChart.Data<Number, Number>> dataInClosedRange = dataList.stream()
                 .filter(data -> containedInClosedInterval(data.getXValue().doubleValue(), finalStartX, finalEndX))
-                .collect(Collectors.toList())
-        );
+                .collect(Collectors.toList());
+        if (dataInClosedRange.size() < 2) {
+            return UNDEFINED;
+        }
+        LinearRegression.LeastSquares adjustment = new LinearRegression.LeastSquares(dataInClosedRange);
         double slope = adjustment.getSlope();
         double intercept = adjustment.getIntercept();
         return new double[]{slope, intercept};
@@ -86,23 +115,6 @@ public class LineFit {
         return value >= start && value <= end;
     }
 
-    private static void fitLineDrawer(LineDrawer lineDrawer, double slope, double intercept) {
-        if (lineDrawer instanceof OriginFixedLineDrawer) {
-
-            double x = lineDrawer.getPoint2().getX();
-            double y = x * slope + intercept;
-            lineDrawer.setPoint2(x, y);
-
-        } else if (lineDrawer instanceof StandardLineDrawer) {
-
-            double x1 = lineDrawer.getPoint1().getX();
-            double y1 = x1 * slope + intercept;
-            double x2 = lineDrawer.getPoint2().getX();
-            double y2 = x2 * slope + intercept;
-
-            lineDrawer.setPoint1(x1, y1);
-            lineDrawer.setPoint2(x2, y2);
-        }
-    }
+    protected abstract void fitLineDrawer(double slope, double intercept);
 
 }

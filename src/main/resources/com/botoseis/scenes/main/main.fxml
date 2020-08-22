@@ -23,7 +23,7 @@
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox prefHeight="800.0" prefWidth="800.0" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.botoseis.scenes.main.MainController">
+<VBox prefHeight="800.0" prefWidth="800.0" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.botoseis.scenes.main.MainController">
   <children>
     <MenuBar VBox.vgrow="NEVER">
       <menus>
@@ -197,6 +197,7 @@
                                           </RadioButton>
                                        </children>
                                     </GridPane>
+                                    <VBox fx:id="container_lineFit" alignment="CENTER" />
                                  </children>
                               </VBox>
                            </content>

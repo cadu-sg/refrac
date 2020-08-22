@@ -232,8 +232,9 @@ public abstract class LineDrawer {
         data2 = null;
     }
 
-    /* Dada uma coordenada nos eixos do gráfico
-       obter suas cooordenadas em relação ao chartPane */
+    public String getColor() {
+        return color;
+    }
 
     /**
      * Given the data values, obtain the equivalent relative to the chartPane coordinate space

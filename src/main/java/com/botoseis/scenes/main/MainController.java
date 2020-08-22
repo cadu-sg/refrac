@@ -69,6 +69,8 @@ public class MainController {
     private GridPane container_layout;
     @FXML
     private HBox container_saving;
+    @FXML
+    private VBox container_lineFit;
 
     @FXML
     private Label label_seqNum;
@@ -166,7 +168,7 @@ public class MainController {
     private void handleLineLoaded() {
         setDisableLineLoadedNodes(false);
 
-        pickChart = new PickChart(container_pickChart, container_interpretation);
+        pickChart = new PickChart(container_pickChart, container_lineFit);
 
         pickChart.assignToolsControllers(
                 toggleButton_zoom.selectedProperty(), toggleButton_eraser.selectedProperty(),
@@ -267,6 +269,7 @@ public class MainController {
         container_layout.setDisable(value);
         container_saving.setDisable(value);
         container_interpretation.setDisable(value);
+        container_lineFit.getChildren().clear();
     }
 
     /**

@@ -4,7 +4,9 @@ import com.botoseis.chart.utils.Eraser;
 import com.botoseis.chart.utils.SeriesLayout;
 import com.botoseis.chart.utils.Zoom;
 import com.botoseis.chart.utils.linedrawer.*;
-import com.botoseis.chart.utils.linedrawer.fit.LineFit;
+import com.botoseis.chart.utils.linedrawer.fit.LineFitEdgy;
+import com.botoseis.chart.utils.linedrawer.fit.LineFitOriginFixed;
+import com.botoseis.chart.utils.linedrawer.fit.LineFitTwoIntersections;
 import com.botoseis.chart.utils.marker.LineChartWithMarkers;
 import com.botoseis.chart.utils.marker.VerticalMarkerGenerator;
 import com.botoseis.structs.Pick;
@@ -28,8 +30,6 @@ public final class PickChart {
 
     private static final double UNDEFINED = 0;
 
-    private final LineChartWithMarkers<Number, Number> chart;
-    private final XYChart.Series<Number, Number> series;
     private final ObservableList<XYChart.Data<Number, Number>> pickDataList;
     private final List<Shot> loadedShots;
     private Shot mainShot;
@@ -73,7 +73,7 @@ public final class PickChart {
         this.loadedShots = new ArrayList<>();
 
         // Series and Data
-        this.series = new XYChart.Series<>();
+        XYChart.Series<Number, Number> series = new XYChart.Series<>();
         this.pickDataList = series.getData();
 
         // Axes
@@ -83,7 +83,7 @@ public final class PickChart {
         yAxis.setLabel("Travel time (ms)");
 
         // Chart
-        this.chart = new LineChartWithMarkers<>(xAxis, yAxis);
+        LineChartWithMarkers<Number, Number> chart = new LineChartWithMarkers<>(xAxis, yAxis);
         chart.setAnimated(false);
         chart.setLegendVisible(false);
         chart.getData().add(series);
@@ -124,7 +124,7 @@ public final class PickChart {
         intercept_head3R = drawer_head3R.interceptProperty();
 
         // Velocities legend
-        VelocitiesLegend velocitiesLegend = new VelocitiesLegend(
+        new VelocitiesLegend(
                 chartPane,
                 slope_head3L,
                 slope_head2L,
@@ -143,6 +143,7 @@ public final class PickChart {
         intersection_head1R_head2R = new IntersectionDetector(drawer_head1R, drawer_head2R);
         intersection_head2R_head3R = new IntersectionDetector(drawer_head2R, drawer_head3R);
 
+        // Vertical marker generator
         new VerticalMarkerGenerator(chart, intersection_head3L_head2L);
         new VerticalMarkerGenerator(chart, intersection_head2L_head1L);
         new VerticalMarkerGenerator(chart, intersection_head1L_directL);
@@ -150,7 +151,31 @@ public final class PickChart {
         new VerticalMarkerGenerator(chart, intersection_head1R_head2R);
         new VerticalMarkerGenerator(chart, intersection_head2R_head3R);
 
-        LineFit fit_head1R = new LineFit(drawer_head1R, pickDataList, intersection_head1R_head2R, lineFitContainer);
+        // Line fit
+        new LineFitEdgy(drawer_head3L, pickDataList,
+                intersection_head3L_head2L,
+                lineFitContainer, "Fit refraction 3 left");
+        new LineFitTwoIntersections(drawer_head2L, pickDataList,
+                intersection_head3L_head2L, intersection_head2L_head1L,
+                lineFitContainer, "Fit refraction 2 left");
+        new LineFitTwoIntersections(drawer_head1L, pickDataList,
+                intersection_head2L_head1L, intersection_head1L_directL,
+                lineFitContainer, "Fit refraction 1 left");
+        new LineFitOriginFixed(drawer_directL, pickDataList,
+                intersection_head1L_directL,
+                lineFitContainer, "Fit direct 1 left");
+        new LineFitOriginFixed(drawer_directR, pickDataList,
+                intersection_directR_head1R,
+                lineFitContainer, "Fit direct 1 right");
+        new LineFitTwoIntersections(drawer_head1R, pickDataList,
+                intersection_directR_head1R, intersection_head1R_head2R,
+                lineFitContainer, "Fit refraction 1 right");
+        new LineFitTwoIntersections(drawer_head2R, pickDataList,
+                intersection_head1R_head2R, intersection_head2R_head3R,
+                lineFitContainer, "Fit refraction 2 right");
+        new LineFitEdgy(drawer_head3R, pickDataList,
+                intersection_head2R_head3R,
+                lineFitContainer, "Fit refraction 3 right");
     }
 
     public void plot(Shot shot) {
