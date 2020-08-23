@@ -51,6 +51,7 @@ public class MainController {
 
     private Shot mainShot;
     private List<Shot> loadedShots;
+    private Point2D[] lastSavedDrawPoints;
 
     private String symbolColor = "#000000";
     private double symbolSize = 0.4;
@@ -67,8 +68,6 @@ public class MainController {
     private StackPane container_layerChart;
     @FXML
     private GridPane container_layout;
-    @FXML
-    private HBox container_saving;
     @FXML
     private VBox container_lineFit;
 
@@ -267,7 +266,6 @@ public class MainController {
     private void setDisableLineLoadedNodes(boolean value) {
         container_toolbar.setDisable(value);
         container_layout.setDisable(value);
-        container_saving.setDisable(value);
         container_interpretation.setDisable(value);
         container_lineFit.getChildren().clear();
     }
@@ -281,7 +279,10 @@ public class MainController {
             loadShots();
             plotLoadedShots();
 
-            loadLineDrawerPoints().ifPresent(this::plotLineDrawerPoints);
+            loadLineDrawerPoints().ifPresent(drawPoints -> {
+                lastSavedDrawPoints = drawPoints;
+                plotLineDrawerPoints(drawPoints);
+            });
 
             handleToggleSymbols();
             handleToggleLines();
@@ -292,7 +293,6 @@ public class MainController {
             showErrorAlert("Cannot load shots", e.getMessage());
         }
     }
-
 
     private void loadShots() throws IOException {
         loadedShots.clear();
@@ -318,7 +318,7 @@ public class MainController {
             }
             // Update labels
             label_seqNum.setText((firstShotIndex + 1) + " to " + (lastShotIndex + 1));
-            label_shotStat.setText(loadedShots.get(0).souStat + "to"
+            label_shotStat.setText(loadedShots.get(0).souStat + " to "
                     + loadedShots.get(loadedShots.size() - 1).souStat);
         }
         label_shotCoordinates.setText(String.format("(%.2f, %.2f)", mainShot.souX, mainShot.souY));
@@ -411,9 +411,10 @@ public class MainController {
         try {
             saveMainShot();
 
-            saveLineDrawerPoints();
+            lastSavedDrawPoints = pickChart.getDrawPoints();
+            saveLineDrawerPoints(lastSavedDrawPoints);
 
-            double[] thicknesses = computeLayerThicknesses();
+            double[] thicknesses = layerThicknessCalculator.computeAvailableLayersThicknesses();
             plotLayerThicknesses(thicknesses);
 
             saveLayerInterpretation(thicknesses);
@@ -427,13 +428,8 @@ public class MainController {
         line.saveShot(pickChart.getMainShot(), mainShotIndex);
     }
 
-    private void saveLineDrawerPoints() throws IOException {
-        Point2D[] drawPoints = pickChart.getDrawPoints();
+    private void saveLineDrawerPoints(Point2D[] drawPoints) throws IOException {
         line.saveDrawPoints(drawPoints, mainShotIndex);
-    }
-
-    private double[] computeLayerThicknesses() {
-        return layerThicknessCalculator.computeAvailableLayersThicknesses();
     }
 
     private void plotLayerThicknesses(double[] thicknesses) {
@@ -477,12 +473,34 @@ public class MainController {
         line.saveLayerInterpretation(interpretation, mainShotIndex);
     }
 
+    private static boolean areDrawPointsEqual(Point2D[] points1, Point2D[] points2) {
+        if (points1.length != points2.length) return false;
+        for (int i = 0; i < points1.length; i++) {
+            if (points1[i].getX() != points2[i].getX() || points1[i].getY() != points2[i].getY()) return false;
+        }
+        return true;
+    }
+
     private void showErrorAlert(String headerText, String contentText) {
         Alert alert = new Alert(AlertType.ERROR);
         alert.setTitle("Error");
         alert.setHeaderText(headerText);
         alert.setContentText(contentText);
         alert.showAndWait();
+    }
+
+    private static class SaveAlert extends Alert {
+
+        public static final ButtonType DO_NOT_SAVE = new ButtonType("Don't save", ButtonBar.ButtonData.NO);
+        public static final ButtonType CANCEL = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        public static final ButtonType SAVE = new ButtonType("Save", ButtonBar.ButtonData.YES);
+
+        public SaveAlert() {
+            super(AlertType.CONFIRMATION);
+            this.setHeaderText("Save changes to current shot?");
+            this.setContentText("Your changes will be permanently lost if you don't save them");
+            this.getButtonTypes().setAll(DO_NOT_SAVE, CANCEL, SAVE);
+        }
     }
 
     // EVENT HANDLER METHODS
@@ -593,8 +611,7 @@ public class MainController {
     @FXML
     public void onPreviousShot(ActionEvent event) {
         if (mainShotIndex != 0) {
-            mainShotIndex--;
-            updatePlot();
+            tryToChangeLoadedShot(mainShotIndex - 1);
         }
         event.consume();
     }
@@ -602,8 +619,7 @@ public class MainController {
     @FXML
     public void onNextShot(ActionEvent event) {
         if (mainShotIndex != shotAmount - 1) {
-            mainShotIndex++;
-            updatePlot();
+            tryToChangeLoadedShot(mainShotIndex + 1);
         }
         event.consume();
     }
@@ -620,10 +636,27 @@ public class MainController {
                 // If the given index is after the last and we are not on the last
                 givenIndex = shotAmount - 1;
             }
-            mainShotIndex = givenIndex;
-            updatePlot();
+            tryToChangeLoadedShot(givenIndex);
         }
         event.consume();
+    }
+
+    private void tryToChangeLoadedShot(int shotIndex) {
+        if (areDrawPointsEqual(pickChart.getDrawPoints(), lastSavedDrawPoints)) {
+            mainShotIndex = shotIndex;
+            updatePlot();
+        } else {
+            new SaveAlert().showAndWait().ifPresent(buttonType -> {
+                if (buttonType == SaveAlert.DO_NOT_SAVE) {
+                    mainShotIndex = shotIndex;
+                    updatePlot();
+                } else if (buttonType == SaveAlert.SAVE) {
+                    savePlot();
+                    mainShotIndex = shotIndex;
+                    updatePlot();
+                }
+            });
+        }
     }
 
     @FXML
@@ -632,13 +665,29 @@ public class MainController {
         if (givenAmount != 0 && givenAmount != amountLoadedShots) {
             if (givenAmount % 2 != 0) {
                 amountLoadedShots = givenAmount;
-                updatePlot();
+                updatePlotExceptLineDrawers();
+
             } else if (givenAmount + 1 != amountLoadedShots) {
                 amountLoadedShots = givenAmount + 1;
-                updatePlot();
+                updatePlotExceptLineDrawers();
+
             }
         }
         event.consume();
+    }
+
+    private void updatePlotExceptLineDrawers() {
+        try {
+            loadShots();
+            plotLoadedShots();
+
+            handleToggleSymbols();
+            handleToggleLines();
+            handleSetSymbolLayout();
+            handleSetLineLayout();
+        } catch (IOException e) {
+            showErrorAlert("Cannot load shots", e.getMessage());
+        }
     }
 
     @FXML

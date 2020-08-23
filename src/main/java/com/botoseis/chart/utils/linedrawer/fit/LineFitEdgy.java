@@ -34,7 +34,7 @@ public final class LineFitEdgy extends LineFit {
         return new double[]{startX, endX};
     }
 
-    private double farthestFromZero(double value1, double value2) {
+    private static double farthestFromZero(double value1, double value2) {
         if (Math.abs(value1) > Math.abs(value2)) {
             return value1;
         } else {

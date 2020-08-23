@@ -44,6 +44,17 @@ public final class LineFitTwoIntersections extends LineFit {
         return new double[]{startX, endX};
     }
 
+    private static double farthestFromFirstValue(double value1, double value2, double value3) {
+        double absValue1 = Math.abs(value1);
+        double absValue2 = Math.abs(value2);
+        double absValue3 = Math.abs(value3);
+        if (Math.abs(absValue1 - absValue2) > Math.abs(absValue1 - absValue3)) {
+            return value2;
+        } else {
+            return value3;
+        }
+    }
+
     @Override
     protected void fitLineDrawer(double slope, double intercept) {
         double x1 = lineDrawer.getPoint1().getX();

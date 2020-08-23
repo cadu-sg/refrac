@@ -71,26 +71,6 @@ abstract class LineFit {
 
     protected abstract double[] computeLineFitBounds();
 
-    protected static double nearestZero(double value1, double value2) {
-        if (Math.abs(value1) < Math.abs(value2)) {
-            return value1;
-        } else {
-            return value2;
-        }
-    }
-
-    protected static double farthestFromFirstValue(double value1, double value2, double value3) {
-        double absValue1 = Math.abs(value1);
-        double absValue2 = Math.abs(value2);
-        double absValue3 = Math.abs(value3);
-        if (Math.abs(absValue1 - absValue2) > Math.abs(absValue1 - absValue3)) {
-            return value2;
-        } else {
-            return value3;
-        }
-    }
-
-
     protected double[] computeLinearRegression(double startX, double endX) {
         if (startX > endX) {
             double swap = startX;

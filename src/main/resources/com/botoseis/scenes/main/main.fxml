@@ -23,7 +23,7 @@
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox prefHeight="800.0" prefWidth="800.0" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.botoseis.scenes.main.MainController">
+<VBox prefHeight="800.0" prefWidth="910.0" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.botoseis.scenes.main.MainController">
   <children>
     <MenuBar VBox.vgrow="NEVER">
       <menus>
@@ -70,6 +70,8 @@
     </MenuBar>
       <ToolBar fx:id="container_toolbar" disable="true">
         <items>
+            <Button mnemonicParsing="false" onAction="#onSavePlot" text="Save" />
+            <Separator orientation="VERTICAL" />
           <Button mnemonicParsing="false" onAction="#onPreviousShot" text="&lt;" />
             <Button mnemonicParsing="false" onAction="#onNextShot" text="&gt;" />
             <Separator orientation="VERTICAL" />
@@ -112,11 +114,6 @@
                <content>
                   <VBox>
                      <children>
-                        <HBox fx:id="container_saving" disable="true">
-                           <children>
-                              <Button mnemonicParsing="false" onAction="#onSavePlot" text="Save plot" />
-                           </children>
-                        </HBox>
                         <TitledPane expanded="false" text="Layout">
                            <content>
                               <GridPane fx:id="container_layout" disable="true">
