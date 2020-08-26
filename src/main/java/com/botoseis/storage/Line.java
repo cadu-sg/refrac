@@ -57,7 +57,6 @@ public final class Line {
 
     public void saveLayerInterpretation(double[] interpretation, int shotIndex) throws IOException {
         interpretationsCSV.saveInterpretation(interpretation, shotIndex);
-
     }
 
     public double[][] loadAllInterpretations() throws IOException {

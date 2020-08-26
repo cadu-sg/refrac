@@ -3,7 +3,7 @@ package com.botoseis.scenes.main;
 import com.botoseis.App;
 import com.botoseis.chart.LayerChart;
 import com.botoseis.chart.PickChart;
-import com.botoseis.math.LayerThicknessCalculator;
+import com.botoseis.math.InterpretationCalculator;
 import com.botoseis.scenes.main.dialogs.NewLineDialog;
 import com.botoseis.scenes.main.dialogs.NewProjectDialog;
 import com.botoseis.storage.Line;
@@ -18,7 +18,6 @@ import javafx.geometry.Point2D;
 import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -42,7 +41,7 @@ public class MainController {
     private BooleanProperty lineLoaded;
     private PickChart pickChart;
     private LayerChart layerChart;
-    private LayerThicknessCalculator layerThicknessCalculator;
+    private InterpretationCalculator interpretationCalculator;
     private static final Path USER_HOME = Paths.get(System.getProperty("user.home"));
 
     private int mainShotIndex;
@@ -182,7 +181,7 @@ public class MainController {
 
         layerChart = new LayerChart(line.getStations(), container_layerChart);
 
-        layerThicknessCalculator = new LayerThicknessCalculator(
+        interpretationCalculator = new InterpretationCalculator(
                 pickChart.slope_head3L,
                 pickChart.slope_head2L,
                 pickChart.slope_head1L,
@@ -414,10 +413,11 @@ public class MainController {
             lastSavedDrawPoints = pickChart.getDrawPoints();
             saveLineDrawerPoints(lastSavedDrawPoints);
 
-            double[] thicknesses = layerThicknessCalculator.computeAvailableLayersThicknesses();
+            interpretationCalculator.computeAvailableInterpretations();
+            double[] thicknesses = interpretationCalculator.getLayerThicknesses();
             plotLayerThicknesses(thicknesses);
 
-            saveLayerInterpretation(thicknesses);
+            saveLayerInterpretation(thicknesses, interpretationCalculator.getVelocities());
 
         } catch (IOException e) {
             showErrorAlert("Cannot save plot", e.getMessage());
@@ -440,7 +440,7 @@ public class MainController {
         }
     }
 
-    private void saveLayerInterpretation(double[] thicknesses) throws IOException {
+    private void saveLayerInterpretation(double[] thicknesses, double[] velocities) throws IOException {
         double[] interpretation = new double[24];
 
         interpretation[0] = mainShot.souStat;
@@ -449,14 +449,14 @@ public class MainController {
         interpretation[2] = thicknesses[1];
         interpretation[3] = thicknesses[2];
 
-        interpretation[4] = pickChart.slope_head3L.get();
-        interpretation[5] = pickChart.slope_head2L.get();
-        interpretation[6] = pickChart.slope_head1L.get();
-        interpretation[7] = pickChart.slope_directL.get();
-        interpretation[8] = pickChart.slope_directR.get();
-        interpretation[9] = pickChart.slope_head1R.get();
-        interpretation[10] = pickChart.slope_head2R.get();
-        interpretation[11] = pickChart.slope_head3R.get();
+        interpretation[4] = velocities[0];
+        interpretation[5] = velocities[1];
+        interpretation[6] = velocities[2];
+        interpretation[7] = 0;
+        interpretation[8] = 0;
+        interpretation[9] = 0;
+        interpretation[10] = 0;
+        interpretation[11] = 0;
         interpretation[12] = pickChart.intercept_head3L.get();
         interpretation[13] = pickChart.intercept_head2L.get();
         interpretation[14] = pickChart.intercept_head1L.get();

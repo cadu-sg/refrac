@@ -2,7 +2,7 @@ package com.botoseis.math;
 
 import javafx.beans.property.DoubleProperty;
 
-public class LayerThicknessCalculator {
+public class InterpretationCalculator {
 
     private final double UNDEFINED = 0;
 
@@ -21,7 +21,15 @@ public class LayerThicknessCalculator {
     private final DoubleProperty intercept_head3L;
     private final DoubleProperty intercept_head3R;
 
-    public LayerThicknessCalculator(
+    private double thickness1;
+    private double thickness2;
+    private double thickness3;
+
+    private double velocity1;
+    private double velocity2;
+    private double velocity3;
+
+    public InterpretationCalculator(
             DoubleProperty slope_head3L,
             DoubleProperty slope_head2L,
             DoubleProperty slope_head1L,
@@ -87,15 +95,11 @@ public class LayerThicknessCalculator {
         }
     }
 
-    public double[] computeAvailableLayersThicknesses() {
+    public void computeAvailableInterpretations() {
 
         boolean interpretation1Available = interpretation1Available();
         boolean interpretation2Available = interpretation2Available();
         boolean interpretation3Available = interpretation3Available();
-
-        System.out.println("interpretation1Available" + interpretation1Available);
-        System.out.println("interpretation2Available" + interpretation2Available);
-        System.out.println("interpretation3Available" + interpretation3Available);
 
         if (interpretation1Available && interpretation2Available && interpretation3Available) {
 
@@ -116,32 +120,20 @@ public class LayerThicknessCalculator {
             if (isUndefined(va4)) va4 = vb4;
             if (isUndefined(vb4)) vb4 = va4;
 
-
-            System.out.println("intercept_1L " + intercept_head1L.get());
-            System.out.println("intercept_1R: " + intercept_head1R.get());
             double t2 = computeIntercept(intercept_head1L.get(), intercept_head1R.get());
             double t3 = computeIntercept(intercept_head2L.get(), intercept_head2R.get());
             double t4 = computeIntercept(intercept_head3L.get(), intercept_head3R.get());
 
-            System.out.println("v1 = " + v1);
-            System.out.println("va2 = " + va2);
-            System.out.println("va3 = " + va3);
-            System.out.println("va4 = " + va4);
-            System.out.println("vb2 = " + vb2);
-            System.out.println("vb3 = " + vb3);
-            System.out.println("vb4 = " + vb4);
-            System.out.println("t2 = " + t2);
-            System.out.println("t3 = " + t3);
-            System.out.println("t4 = " + t4);
-
             double[] results1 = computeThicknessLayer1(v1, va2, vb2, t2);
             double[] results2 = computeThicknessLayer2(v1, va3, vb3, t3, results1);
-            // Returns h1, h2 and h3
-            return new double[]{
-                    results1[0],
-                    results2[0],
-                    computeThicknessLayer3(v1, va4, vb4, t4, results1, results2)
-            };
+
+            thickness1 = results1[0];
+            thickness2 = results2[0];
+            thickness3 = computeThicknessLayer3(v1, va4, vb4, t4, results1, results2);
+
+            velocity1 = v1;
+            velocity2 = results1[1];
+            velocity3 = results2[1];
 
         } else if (interpretation1Available && interpretation2Available) {
 
@@ -150,65 +142,65 @@ public class LayerThicknessCalculator {
             double va3 = computeVelocity(slope_head2L.get());
             double vb2 = computeVelocity(slope_head1R.get());
             double vb3 = computeVelocity(slope_head2R.get());
-            if (isUndefined(va2)) {
-                va2 = vb2;
-            }
-            if (isUndefined(vb2)) {
-                vb2 = va2;
-            }
-            if (isUndefined(va3)) {
-                va3 = vb3;
-            }
-            if (isUndefined(vb3)) {
-                vb3 = va3;
-            }
+
+            if (isUndefined(va2)) va2 = vb2;
+            if (isUndefined(vb2)) vb2 = va2;
+
+            if (isUndefined(va3)) va3 = vb3;
+            if (isUndefined(vb3)) vb3 = va3;
+
             double t2 = computeIntercept(intercept_head1L.get(), intercept_head1R.get());
             double t3 = computeIntercept(intercept_head2L.get(), intercept_head2R.get());
 
-            System.out.println("v1 = " + v1);
-            System.out.println("va2 = " + va2);
-            System.out.println("va3 = " + va3);
-            System.out.println("vb2 = " + vb2);
-            System.out.println("vb3 = " + vb3);
-            System.out.println("t2 = " + t2);
-            System.out.println("t3 = " + t3);
-
             double[] results1 = computeThicknessLayer1(v1, va2, vb2, t2);
-            // Returns h1 and h2
-            return new double[]{
-                    results1[0],
-                    computeThicknessLayer2(v1, va3, vb3, t3, results1)[0],
-                    UNDEFINED};
+            double[] results2 = computeThicknessLayer2(v1, va3, vb3, t3, results1);
+
+            thickness1 = results1[0];
+            thickness2 = results2[0];
+            thickness3 = UNDEFINED;
+
+            velocity1 = v1;
+            velocity2 = results1[1];
+            velocity3 = results2[1];
 
         } else if (interpretation1Available) {
 
             double v1 = computeVelocity(slope_directL.get(), slope_directR.get());
             double va2 = computeVelocity(slope_head1L.get());
             double vb2 = computeVelocity(slope_head1R.get());
-            if (isUndefined(va2)) {
-                va2 = vb2;
-            }
-            if (isUndefined(vb2)) {
-                vb2 = va2;
-            }
-            System.out.println("intercept_1L " + intercept_head1L.get());
-            System.out.println("intercept_1R: " + intercept_head1R.get());
+
+            if (isUndefined(va2)) va2 = vb2;
+            if (isUndefined(vb2)) vb2 = va2;
+
             double t2 = computeIntercept(intercept_head1L.get(), intercept_head1R.get());
 
-            System.out.println("v1 = " + v1);
-            System.out.println("va2 = " + va2);
-            System.out.println("vb2 = " + vb2);
-            System.out.println("t2 = " + t2);
+            double[] results1 = computeThicknessLayer1(v1, va2, vb2, t2);
 
-            // Returns h1
-            return new double[]{
-                    computeThicknessLayer1(v1, va2, vb2, t2)[0],
-                    UNDEFINED,
-                    UNDEFINED};
+            thickness1 = results1[0];
+            thickness2 = UNDEFINED;
+            thickness3 = UNDEFINED;
+
+            velocity1 = v1;
+            velocity2 = results1[1];
+            velocity3 = UNDEFINED;
 
         } else {
-            return new double[]{UNDEFINED, UNDEFINED, UNDEFINED};
+            thickness1 = UNDEFINED;
+            thickness2 = UNDEFINED;
+            thickness3 = UNDEFINED;
+
+            velocity1 = UNDEFINED;
+            velocity2 = UNDEFINED;
+            velocity3 = UNDEFINED;
         }
+    }
+
+    public double[] getLayerThicknesses() {
+        return new double[]{thickness1, thickness2, thickness3};
+    }
+
+    public double[] getVelocities() {
+        return new double[]{velocity1, velocity2, velocity3};
     }
 
     private boolean interpretation1Available() {
@@ -276,12 +268,7 @@ public class LayerThicknessCalculator {
      * @return h2 (m), v3 (m/s) and w3 (rad)
      */
     public static double[] computeThicknessLayer2(double v1, double va3, double vb3, double t3, double[] results1) {
-        /*
-        System.out.printf("v1: %.2f m/s\n", v1);
-        System.out.printf("va3: %.2f m/s\n", va3);
-        System.out.printf("vb3: %.2f m/s\n", va3);
-        System.out.printf("t3: %.2f s\n", t3);
-         */
+
         double h1 = results1[0];
         double v2 = results1[1];
         double w2 = results1[2];
