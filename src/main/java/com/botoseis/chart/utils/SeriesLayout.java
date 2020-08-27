@@ -20,13 +20,7 @@ public class SeriesLayout {
     }
 
     public void setSymbolsStyle(String color, String shape, double size) {
-        String styleString = getSymbolStyleString(color, shape);
-        series.getData().forEach(data -> {
-            Node dataNode = data.getNode();
-            dataNode.setStyle(styleString);
-            dataNode.setScaleX(size);
-            dataNode.setScaleY(size);
-        });
+        setSymbolsStyle(series, color, shape, size);
     }
 
     public void setSymbolsColorShape(String color, String shape) {
@@ -173,17 +167,36 @@ public class SeriesLayout {
     }
 
     public void setSymbolsVisible(boolean value) {
-        series.getData().forEach(data ->
-                data.getNode().setVisible(value)
-        );
+        setSymbolsVisible(series, value);
     }
 
     public void setLineVisible(boolean value) {
         series.getNode().setVisible(value);
     }
 
+    public static void setDataStyle(XYChart.Data<Number, Number> data, String color, String shape, double size) {
+        Node dataNode = data.getNode();
+        dataNode.setStyle(getSymbolStyleString(color, shape));
+        dataNode.setScaleX(size);
+        dataNode.setScaleY(size);
+    }
+
     public static void setDataStyle(XYChart.Data<Number, Number> data, String color, String shape) {
         data.getNode().setStyle(getSymbolStyleString(color, shape));
+    }
+
+    public static void setSymbolsStyle(XYChart.Series<Number, Number> series, String color, String shape, double size) {
+        String styleString = getSymbolStyleString(color, shape);
+        series.getData().forEach(data -> {
+            Node dataNode = data.getNode();
+            dataNode.setStyle(styleString);
+            dataNode.setScaleX(size);
+            dataNode.setScaleY(size);
+        });
+    }
+
+    public static void setSymbolsVisible(XYChart.Series<Number, Number> series, boolean value) {
+        series.getData().forEach(data -> data.getNode().setVisible(value));
     }
 
     public static void setLineVisible(XYChart.Series<Number, Number> series, boolean value) {

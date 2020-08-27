@@ -1,9 +1,11 @@
 package com.botoseis.chart;
 
+import com.botoseis.chart.utils.SeriesLayout;
 import com.botoseis.structs.Station;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Side;
+import javafx.scene.Node;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
@@ -17,6 +19,12 @@ public final class LayerChart {
     private final ObservableList<XYChart.Data<Number, Number>> interface1;
     private final ObservableList<XYChart.Data<Number, Number>> interface2;
     private final ObservableList<XYChart.Data<Number, Number>> interface3;
+
+    private static final String COLOR_1 = "#FBA71B";
+    private static final String COLOR_2 = "#57B757";
+    private static final String COLOR_3 = "#41A9C9";
+    private static final String SHAPE = "ho";
+    private static final double SIZE = 0.5;
 
     public LayerChart(Station[] stations, StackPane chartPane) {
 
@@ -37,7 +45,6 @@ public final class LayerChart {
         // Chart
         LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
         chart.setAnimated(false);
-        chart.setCreateSymbols(false);
 
         chartPane.getChildren().add(chart);
 
@@ -51,6 +58,8 @@ public final class LayerChart {
         chart.getData().add(series_interface1);
         chart.getData().add(series_interface2);
         chart.getData().add(series_interface3);
+
+        SeriesLayout.setSymbolsVisible(series_surface, false);
     }
 
     public void plotLayerThickness(double[] thicknesses, Station station) {
@@ -69,9 +78,15 @@ public final class LayerChart {
             double interface3_elev = interface2_elev - layer3_thickness;
 
             clearStationInterfaceData(statNum);
-            interface1.add(new XYChart.Data<>(offset, interface1_elev, statNum));
-            interface2.add(new XYChart.Data<>(offset, interface2_elev, statNum));
-            interface3.add(new XYChart.Data<>(offset, interface3_elev, statNum));
+            XYChart.Data<Number, Number> data1 = new XYChart.Data<>(offset, interface1_elev, statNum);
+            XYChart.Data<Number, Number> data2 = new XYChart.Data<>(offset, interface2_elev, statNum);
+            XYChart.Data<Number, Number> data3 = new XYChart.Data<>(offset, interface3_elev, statNum);
+            interface1.add(data1);
+            interface2.add(data2);
+            interface3.add(data3);
+            SeriesLayout.setDataStyle(data1, COLOR_1, SHAPE, SIZE);
+            SeriesLayout.setDataStyle(data2, COLOR_2, SHAPE, SIZE);
+            SeriesLayout.setDataStyle(data3, COLOR_3, SHAPE, SIZE);
         }
     }
 
@@ -85,6 +100,5 @@ public final class LayerChart {
         interface2.removeIf(data -> (int) data.getExtraValue() == statNum);
         interface3.removeIf(data -> (int) data.getExtraValue() == statNum);
     }
-
 
 }
