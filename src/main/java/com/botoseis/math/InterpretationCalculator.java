@@ -25,6 +25,7 @@ public class InterpretationCalculator {
     private double thickness2;
     private double thickness3;
 
+    private double velocity0;
     private double velocity1;
     private double velocity2;
     private double velocity3;
@@ -131,9 +132,9 @@ public class InterpretationCalculator {
             thickness2 = results2[0];
             thickness3 = computeThicknessLayer3(v1, va4, vb4, t4, results1, results2);
 
-            velocity1 = v1;
-            velocity2 = results1[1];
-            velocity3 = results2[1];
+            velocity0 = v1;
+            velocity1 = results1[1];
+            velocity2 = results2[1];
 
         } else if (interpretation1Available && interpretation2Available) {
 
@@ -159,9 +160,9 @@ public class InterpretationCalculator {
             thickness2 = results2[0];
             thickness3 = UNDEFINED;
 
-            velocity1 = v1;
-            velocity2 = results1[1];
-            velocity3 = results2[1];
+            velocity0 = v1;
+            velocity1 = results1[1];
+            velocity2 = results2[1];
 
         } else if (interpretation1Available) {
 
@@ -180,18 +181,18 @@ public class InterpretationCalculator {
             thickness2 = UNDEFINED;
             thickness3 = UNDEFINED;
 
-            velocity1 = v1;
-            velocity2 = results1[1];
-            velocity3 = UNDEFINED;
+            velocity0 = v1;
+            velocity1 = results1[1];
+            velocity2 = UNDEFINED;
 
         } else {
             thickness1 = UNDEFINED;
             thickness2 = UNDEFINED;
             thickness3 = UNDEFINED;
 
+            velocity0 = UNDEFINED;
             velocity1 = UNDEFINED;
             velocity2 = UNDEFINED;
-            velocity3 = UNDEFINED;
         }
     }
 
@@ -200,7 +201,7 @@ public class InterpretationCalculator {
     }
 
     public double[] getVelocities() {
-        return new double[]{velocity1, velocity2, velocity3};
+        return new double[]{velocity0, velocity1, velocity2};
     }
 
     private boolean interpretation1Available() {

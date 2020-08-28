@@ -23,7 +23,7 @@ public class InterpretationsCSV {
     public static final int NUMBER_OF_INTERPRETATION_ELEMENTS = 24;
     public static final CSVFormat CSV_FORMAT = CSVFormat.DEFAULT.withHeader(
             "index", "sourceStation", "z1", "z2", "z3",
-            "v1", "v2", "v3", "nada", "nada", "nada", "nada", "nada",
+            "v0", "v1", "v2", "v3", "nada", "nada", "nada", "nada",
             "t3L", "t2L", "t1L", "t1R", "t2R", "t3R",
             "x3L", "x2L", "x1L", "x1R", "x2R", "x3R");
 
