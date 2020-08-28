@@ -1,7 +1,10 @@
 package com.botoseis.chart.utils;
 
+import javafx.collections.ObservableList;
 import javafx.scene.Node;
 import javafx.scene.chart.XYChart;
+
+import java.util.List;
 
 public class SeriesLayout {
     private final XYChart.Series<Number, Number> series;
@@ -190,6 +193,14 @@ public class SeriesLayout {
         series.getData().forEach(data -> {
             Node dataNode = data.getNode();
             dataNode.setStyle(styleString);
+            dataNode.setScaleX(size);
+            dataNode.setScaleY(size);
+        });
+    }
+
+    public static void setSymbolsSize(List<XYChart.Data<Number, Number>> dataList, double size) {
+        dataList.forEach(data -> {
+            Node dataNode = data.getNode();
             dataNode.setScaleX(size);
             dataNode.setScaleY(size);
         });

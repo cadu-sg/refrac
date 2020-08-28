@@ -337,6 +337,7 @@ public class MainController {
         } else {
             pickChart.plot(loadedShots, mainShot);
         }
+        layerChart.plotShotInSurface(mainShot);
     }
 
     private Optional<Point2D[]> loadFirstPreviousDrawPoints() throws IOException {

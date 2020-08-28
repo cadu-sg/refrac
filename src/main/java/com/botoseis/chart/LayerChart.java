@@ -1,6 +1,7 @@
 package com.botoseis.chart;
 
 import com.botoseis.chart.utils.SeriesLayout;
+import com.botoseis.structs.Shot;
 import com.botoseis.structs.Station;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -12,10 +13,12 @@ import javafx.scene.chart.XYChart;
 import javafx.scene.layout.StackPane;
 
 import java.util.Arrays;
+import java.util.stream.IntStream;
 
 public final class LayerChart {
 
     private static final double UNDEFINED = 0;
+    private final ObservableList<XYChart.Data<Number, Number>> surface;
     private final ObservableList<XYChart.Data<Number, Number>> interface1;
     private final ObservableList<XYChart.Data<Number, Number>> interface2;
     private final ObservableList<XYChart.Data<Number, Number>> interface3;
@@ -28,7 +31,7 @@ public final class LayerChart {
 
     public LayerChart(Station[] stations, StackPane chartPane) {
 
-        final ObservableList<XYChart.Data<Number, Number>> surface = FXCollections.observableArrayList();
+        this.surface = FXCollections.observableArrayList();
         this.interface1 = FXCollections.observableArrayList();
         this.interface2 = FXCollections.observableArrayList();
         this.interface3 = FXCollections.observableArrayList();
@@ -59,7 +62,7 @@ public final class LayerChart {
         chart.getData().add(series_interface2);
         chart.getData().add(series_interface3);
 
-        SeriesLayout.setSymbolsVisible(series_surface, false);
+        SeriesLayout.setSymbolsSize(surface, 0.0);
     }
 
     public void plotLayerThickness(double[] thicknesses, Station station) {
@@ -88,6 +91,29 @@ public final class LayerChart {
             SeriesLayout.setDataStyle(data2, COLOR_2, SHAPE, SIZE);
             SeriesLayout.setDataStyle(data3, COLOR_3, SHAPE, SIZE);
         }
+    }
+
+    public void plotShotInSurface(Shot shot) {
+        SeriesLayout.setSymbolsSize(surface, 0.0);
+
+        // Receiver symbols
+        int[] picksRecStat = Arrays.stream(shot.picks).mapToInt(value -> value.recStat).toArray();
+        surface.stream()
+                .filter(data -> containedInArray((int) data.getExtraValue(), picksRecStat))
+                .forEach(data -> SeriesLayout.setDataStyle(data, "black", "o", 0.4));
+
+        // Source symbol
+        for (XYChart.Data<Number, Number> data : surface) {
+            if ((int) data.getExtraValue() == shot.souStat) {
+                SeriesLayout.setDataStyle(data, "blue", "D", 1.5);
+                break;
+            }
+        }
+
+    }
+
+    private static boolean containedInArray(int value, int[] array) {
+        return Arrays.stream(array).anyMatch(value1 -> value == value1);
     }
 
     /**
