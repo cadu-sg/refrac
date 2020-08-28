@@ -260,6 +260,7 @@ public class MainController {
         container_layerChart.getChildren().clear();
         pickChart = null;
         layerChart = null;
+        lastSavedDrawPoints = null;
     }
 
     private void setDisableLineLoadedNodes(boolean value) {
@@ -278,10 +279,10 @@ public class MainController {
             loadShots();
             plotLoadedShots();
 
-            loadLineDrawerPoints().ifPresent(drawPoints -> {
+            loadFirstPreviousDrawPoints().ifPresentOrElse(drawPoints -> {
                 lastSavedDrawPoints = drawPoints;
                 plotLineDrawerPoints(drawPoints);
-            });
+            }, () -> lastSavedDrawPoints = null);
 
             handleToggleSymbols();
             handleToggleLines();
@@ -338,7 +339,7 @@ public class MainController {
         }
     }
 
-    private Optional<Point2D[]> loadLineDrawerPoints() throws IOException {
+    private Optional<Point2D[]> loadFirstPreviousDrawPoints() throws IOException {
         for (int shotIndex = mainShotIndex; shotIndex >= 0; shotIndex--) {
             Point2D[] drawPoints = line.loadDrawPoints(shotIndex);
             if (isAnyPointDefined(drawPoints)) {
@@ -642,7 +643,7 @@ public class MainController {
     }
 
     private void tryToChangeLoadedShot(int shotIndex) {
-        if (areDrawPointsEqual(pickChart.getDrawPoints(), lastSavedDrawPoints)) {
+        if (areDrawPointsEqualToLastSaved()) {
             mainShotIndex = shotIndex;
             updatePlot();
         } else {
@@ -657,6 +658,13 @@ public class MainController {
                 }
             });
         }
+    }
+
+    private boolean areDrawPointsEqualToLastSaved() {
+        if (lastSavedDrawPoints == null) {
+            return !isAnyPointDefined(pickChart.getDrawPoints());
+        }
+        return areDrawPointsEqual(pickChart.getDrawPoints(), lastSavedDrawPoints);
     }
 
     @FXML
