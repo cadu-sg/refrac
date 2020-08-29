@@ -2,12 +2,12 @@ package com.botoseis.chart;
 
 import com.botoseis.chart.utils.SeriesLayout;
 import com.botoseis.structs.Shot;
+import com.botoseis.structs.ShotMetadata;
 import com.botoseis.structs.Station;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Point2D;
 import javafx.geometry.Side;
-import javafx.scene.Node;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
@@ -15,7 +15,6 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.StackPane;
 
 import java.util.Arrays;
-import java.util.stream.IntStream;
 
 public final class LayerChart {
 
@@ -72,19 +71,43 @@ public final class LayerChart {
         chart.getData().add(series_interface3);
 
         SeriesLayout.setSymbolsSize(surface, 0.0);
-
-        assignGoToMainShotIndex();
     }
 
-    public void assignGoToMainShotIndex() {
+    public void enableGoToShotFeature(int mainShotIndex, ShotMetadata[] shotsMetadata) {
+
+        double[] shotsSouX = Arrays.stream(shotsMetadata).mapToDouble(shot -> shot.souX).toArray();
+
         chartPane.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> {
             double selectedX = mouseEventToDataXValue(event);
+
+            int nearestStationShotIndex = getNearestValueIndex(selectedX, shotsSouX);
+            int nearestStationNumber = shotsMetadata[nearestStationShotIndex].souStat;
+
             System.out.println(selectedX);
+            System.out.println("nearest station number " + nearestStationNumber);
             event.consume();
         });
     }
 
-    protected final double mouseEventToDataXValue(MouseEvent event) {
+    private static int getNearestValueIndex(double givenValue, double[] values) {
+        int nearestValueIndex = 0;
+        double nearestValueDistance = Double.MAX_VALUE;
+
+        for (int i = 0, arrayLength = values.length; i < arrayLength; i++) {
+            double distance = computeDistance(givenValue, values[i]);
+            if (distance < nearestValueDistance) {
+                nearestValueDistance = distance;
+                nearestValueIndex = i;
+            }
+        }
+        return nearestValueIndex;
+    }
+
+    private static double computeDistance(double value1, double value2) {
+        return Math.abs(value1 - value2);
+    }
+
+    private double mouseEventToDataXValue(MouseEvent event) {
         Point2D pointRelativeToScene = new Point2D(event.getSceneX(), event.getSceneY());
         return xAxis.getValueForDisplay(xAxis.sceneToLocal(pointRelativeToScene).getX()).doubleValue();
     }

@@ -168,7 +168,7 @@ public class MainController {
 
         pickChart = new PickChart(container_pickChart, container_lineFit);
 
-        pickChart.assignToolsControllers(
+        pickChart.enableFeatures(
                 toggleButton_zoom.selectedProperty(), toggleButton_eraser.selectedProperty(),
                 radioButton_refraction3L.selectedProperty(),
                 radioButton_refraction2L.selectedProperty(),
@@ -180,6 +180,8 @@ public class MainController {
                 radioButton_refraction3R.selectedProperty());
 
         layerChart = new LayerChart(line.getStations(), container_layerChart);
+
+        layerChart.enableGoToShotFeature(mainShotIndex, line.getShotsMetadata());
 
         interpretationCalculator = new InterpretationCalculator(
                 pickChart.slope_head3L,

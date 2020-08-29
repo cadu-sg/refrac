@@ -1,6 +1,7 @@
 package com.botoseis.storage;
 
 import com.botoseis.structs.Shot;
+import com.botoseis.structs.ShotMetadata;
 import com.botoseis.structs.Station;
 import javafx.geometry.Point2D;
 
@@ -37,6 +38,14 @@ public final class Line {
 
     public int getStationAmount() {
         return picksTxt.getStationAmount();
+    }
+
+    public int[] getShotsStationNumber() {
+        return picksTxt.getShotsStationsNumber();
+    }
+
+    public ShotMetadata[] getShotsMetadata() {
+        return picksTxt.getShotsMetadata();
     }
 
     public void saveShot(Shot shot, int shotIndex) throws IOException {

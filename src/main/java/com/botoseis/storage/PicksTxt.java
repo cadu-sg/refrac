@@ -3,6 +3,7 @@ package com.botoseis.storage;
 
 import com.botoseis.structs.Pick;
 import com.botoseis.structs.Shot;
+import com.botoseis.structs.ShotMetadata;
 import com.botoseis.structs.Station;
 
 import java.io.IOException;
@@ -54,11 +55,11 @@ public class PicksTxt {
 
     private final Path picksPath;
     private final int pickAmount;
-    private final int[] shotsPickAmount;
     private final int shotAmount;
     private final Station[] stations;
     private final int stationAmount;
-    private final int[] shotsStationNumber;
+
+    private final ShotMetadata[] shotsMetadata;
 
     public int getPickAmount() {
         return pickAmount;
@@ -77,17 +78,20 @@ public class PicksTxt {
     }
 
     public int[] getShotsStationsNumber() {
-        return shotsStationNumber;
+        return Arrays.stream(shotsMetadata).mapToInt(shot -> shot.souStat).toArray();
     }
 
-    private PicksTxt(Path picksPath, int pickAmount, int shotAmount, int stationAmount, Station[] stations, int[] shotsPickAmount, int[] shotsStationNumber) {
+    public ShotMetadata[] getShotsMetadata() {
+        return shotsMetadata;
+    }
+
+    private PicksTxt(Path picksPath, int pickAmount, int shotAmount, int stationAmount, Station[] stations, ShotMetadata[] shotsMetadata) {
         this.picksPath = picksPath;
         this.pickAmount = pickAmount;
-        this.shotsPickAmount = shotsPickAmount;
         this.shotAmount = shotAmount;
         this.stationAmount = stationAmount;
         this.stations = stations;
-        this.shotsStationNumber = shotsStationNumber;
+        this.shotsMetadata = shotsMetadata;
     }
 
     public static PicksTxt open(Path picksPath) throws IOException, IllegalArgumentException {
@@ -96,9 +100,8 @@ public class PicksTxt {
         int pickAmount = 0;
         int shotAmount;
         int stationAmount;
-        List<Integer> shotsPickAmount = new ArrayList<>();
-        List<Integer> shotsStationNumber = new ArrayList<>();
         List<Station> stations = new ArrayList<>();
+        List<ShotMetadata> shotsMetadata = new ArrayList<>();
 
         // Iterate over the lines of the whole file to obtain the following information:
         // - Every station information: number, xy coordinates and elevation
@@ -115,17 +118,15 @@ public class PicksTxt {
             int souStat = scanner.nextInt();  // SOU_SLOC
             int recStat = scanner.nextInt();  // SRF_SLOC
             scanner.next();  // Ignore FB_PICK
-            scanner.next();  // Ignore SOU_X
-            scanner.next();  // Ignore SOU_Y
+            float souX = scanner.nextFloat();  // SOU_X
+            float souY = scanner.nextFloat();  // SOU_Y
             float recX = scanner.nextFloat();  // REC_X
             float recY = scanner.nextFloat();  // REC_Y
             float recElev = scanner.nextFloat();  // REC_ELEV
             scanner.nextLine();  // Ignore OFFSET and CDP
 
-            // Determine station number of each shot
-            shotsStationNumber.add(souStat);
-
             // Determine stations
+            // ------------------
             int latest_recStat = recStat;
             Station station = new Station();
             station.num = recStat;
@@ -134,9 +135,18 @@ public class PicksTxt {
             station.elev = recElev;
             stations.add(station);
 
-            // Determine pick amount of each shot
+            // Determine metadata of each shot
+            // -------------------------------
+            ShotMetadata currentShot = new ShotMetadata();
+            // Determine seqNum
             int prev_seqNum = seqNum;
-            int currentShotPickAmount = 1;
+            // Determine picksAmount
+            int currentPickAmount = 1;
+            // Determine souStat
+            currentShot.seqNum = seqNum;
+            currentShot.souStat = souStat;
+            currentShot.souX = souX;
+            currentShot.souY = souY;
 
             while (scanner.hasNextLine()) {
 
@@ -144,25 +154,31 @@ public class PicksTxt {
                 souStat = scanner.nextInt();  // SOU_SLOC
                 recStat = scanner.nextInt();  // SRF_SLOC
                 scanner.next();  // Ignore FB_PICK
-                scanner.next();  // Ignore SOU_X
-                scanner.next();  // Ignore SOU_Y
+                souX = scanner.nextFloat();  // SOU_X
+                souY = scanner.nextFloat();  // SOU_Y
                 recX = scanner.nextFloat();  // REC_X
                 recY = scanner.nextFloat();  // REC_Y
                 recElev = scanner.nextFloat();  // REC_ELEV
                 scanner.nextLine();  // Ignore OFFSET and CDP
 
-                // Determine pick amount of each shot
-                // Determine station number of each shot
-                if (seqNum != prev_seqNum) {
-                    // First pick of new every new shot
+                // Determine shot metadata
+                // -----------------------
+                if (seqNum != prev_seqNum) {  // First pick of new every new shot
+
                     prev_seqNum = seqNum;
 
-                    shotsStationNumber.add(souStat);
+                    currentShot.pickAmount = currentPickAmount;
+                    shotsMetadata.add(currentShot);
 
-                    shotsPickAmount.add(currentShotPickAmount);
-                    currentShotPickAmount = 1;
+                    currentShot = new ShotMetadata();
+                    currentShot.seqNum = seqNum;
+                    currentShot.souStat = souStat;
+                    currentShot.souX = souX;
+                    currentShot.souY = souY;
+
+                    currentPickAmount = 1;
                 } else {
-                    currentShotPickAmount++;
+                    currentPickAmount++;
                 }
 
                 // Determine stations
@@ -178,7 +194,8 @@ public class PicksTxt {
 
                 pickAmount++;
             }
-            shotsPickAmount.add(currentShotPickAmount);
+            currentShot.pickAmount = currentPickAmount;
+            shotsMetadata.add(currentShot);
 
         } catch (NoSuchFileException e) {
             throw new IllegalArgumentException("Cannot read picks.dat: no such file", e);
@@ -188,20 +205,19 @@ public class PicksTxt {
             throw new IOException("Cannot read picks.dat: an IO exception occurred", e);
         }
 
-        shotAmount = shotsPickAmount.size();
+        shotAmount = shotsMetadata.size();
         stationAmount = stations.size();
 
         System.out.println("\nTotal number of picks: " + pickAmount);
         System.out.println("Number of shots: " + shotAmount);
         System.out.println("Number of stations: " + stationAmount + '\n');
-        System.out.println("Number of picks at each shot: " + shotsPickAmount);
-        System.out.println("Station number of each shot:" + shotsStationNumber);
-
+        System.out.println("Number of picks at each shot: " + Arrays.toString(shotsMetadata.stream().mapToInt(shot -> shot.pickAmount).toArray()));
+        System.out.println("Station number of each shot: " + Arrays.toString(shotsMetadata.stream().mapToInt(shot -> shot.souStat).toArray()));
 
         return new PicksTxt(picksPath, pickAmount,
-                shotAmount, stationAmount, stations.toArray(new Station[0]),
-                shotsPickAmount.stream().mapToInt(Integer::intValue).toArray(),
-                shotsStationNumber.stream().mapToInt(Integer::intValue).toArray());
+                shotAmount, stationAmount,
+                stations.toArray(new Station[0]),
+                shotsMetadata.toArray(new ShotMetadata[0]));
     }
 
     public PicksBin createPicksBin(Path picksBinPath) throws IOException, IllegalArgumentException {
@@ -220,7 +236,7 @@ public class PicksTxt {
             for (int shotIndex = 0; shotIndex < shotAmount; shotIndex++) {
 
                 Shot shot = new Shot();
-                shot.pickAmount = shotsPickAmount[shotIndex];
+                shot.pickAmount = shotsMetadata[shotIndex].pickAmount;
                 shot.picks = new Pick[shot.pickAmount];
 
                 // First to penultimate pick of the current shot

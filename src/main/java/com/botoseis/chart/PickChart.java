@@ -31,7 +31,6 @@ public final class PickChart {
     private static final double UNDEFINED = 0;
 
     private final ObservableList<XYChart.Data<Number, Number>> pickDataList;
-    private final List<Shot> loadedShots;
     private Shot mainShot;
 
     private final SeriesLayout seriesLayout;
@@ -70,7 +69,6 @@ public final class PickChart {
     public final IntersectionDetector intersection_head2R_head3R;
 
     public PickChart(StackPane chartPane, VBox lineFitContainer) {
-        this.loadedShots = new ArrayList<>();
 
         // Series and Data
         XYChart.Series<Number, Number> series = new XYChart.Series<>();
@@ -187,7 +185,6 @@ public final class PickChart {
                     new PickWithSouStat(pick, shot.souStat)));
         }
 
-        loadedShots.add(shot);
         mainShot = shot;
     }
 
@@ -202,20 +199,18 @@ public final class PickChart {
             }
         }
 
-        loadedShots.addAll(shots);
         this.mainShot = mainShot;
     }
 
     public void clearPicks() {
         pickDataList.clear();
-        loadedShots.clear();
     }
 
     public SeriesLayout getLayout() {
         return seriesLayout;
     }
 
-    public void assignToolsControllers(
+    public void enableFeatures(
             BooleanProperty toggle_zoom, BooleanProperty toggle_eraser,
             BooleanProperty toggle_head3L, BooleanProperty toggle_head2L, BooleanProperty toggle_head1L, BooleanProperty toggle_directL,
             BooleanProperty toggle_directR, BooleanProperty toggle_head1R, BooleanProperty toggle_head2R, BooleanProperty toggle_head3R) {
