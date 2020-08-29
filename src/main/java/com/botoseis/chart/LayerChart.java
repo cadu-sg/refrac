@@ -80,11 +80,10 @@ public final class LayerChart {
         chartPane.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> {
             double selectedX = mouseEventToDataXValue(event);
 
-            int nearestStationShotIndex = getNearestValueIndex(selectedX, shotsSouX);
-            int nearestStationNumber = shotsMetadata[nearestStationShotIndex].souStat;
+            int nearestShotIndex = getNearestValueIndex(selectedX, shotsSouX);
 
             System.out.println(selectedX);
-            System.out.println("nearest station number " + nearestStationNumber);
+            System.out.println("nearest shot index " + nearestShotIndex);
             event.consume();
         });
     }
