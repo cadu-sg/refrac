@@ -5,17 +5,24 @@ import com.botoseis.structs.Shot;
 import com.botoseis.structs.Station;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.geometry.Point2D;
 import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.StackPane;
 
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
 public final class LayerChart {
+
+
+    private final StackPane chartPane;
+    private final NumberAxis xAxis;
+    private final NumberAxis yAxis;
 
     private static final double UNDEFINED = 0;
     private final ObservableList<XYChart.Data<Number, Number>> surface;
@@ -31,6 +38,8 @@ public final class LayerChart {
 
     public LayerChart(Station[] stations, StackPane chartPane) {
 
+        this.chartPane = chartPane;
+
         this.surface = FXCollections.observableArrayList();
         this.interface1 = FXCollections.observableArrayList();
         this.interface2 = FXCollections.observableArrayList();
@@ -41,8 +50,8 @@ public final class LayerChart {
                 surface.add(new XYChart.Data<>(station.x, station.elev, station.num)));
 
         // Axes
-        NumberAxis xAxis = new NumberAxis();
-        NumberAxis yAxis = new NumberAxis();
+        xAxis = new NumberAxis();
+        yAxis = new NumberAxis();
         xAxis.setSide(Side.TOP);
 
         // Chart
@@ -63,6 +72,21 @@ public final class LayerChart {
         chart.getData().add(series_interface3);
 
         SeriesLayout.setSymbolsSize(surface, 0.0);
+
+        assignGoToMainShotIndex();
+    }
+
+    public void assignGoToMainShotIndex() {
+        chartPane.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> {
+            double selectedX = mouseEventToDataXValue(event);
+            System.out.println(selectedX);
+            event.consume();
+        });
+    }
+
+    protected final double mouseEventToDataXValue(MouseEvent event) {
+        Point2D pointRelativeToScene = new Point2D(event.getSceneX(), event.getSceneY());
+        return xAxis.getValueForDisplay(xAxis.sceneToLocal(pointRelativeToScene).getX()).doubleValue();
     }
 
     public void plotLayerThickness(double[] thicknesses, Station station) {
@@ -105,7 +129,7 @@ public final class LayerChart {
         // Source symbol
         for (XYChart.Data<Number, Number> data : surface) {
             if ((int) data.getExtraValue() == shot.souStat) {
-                SeriesLayout.setDataStyle(data, "blue", "D", 1.5);
+                SeriesLayout.setDataStyle(data, "#ff9800", "D", 1.5);
                 break;
             }
         }

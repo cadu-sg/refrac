@@ -58,13 +58,10 @@ public class PicksTxt {
     private final int shotAmount;
     private final Station[] stations;
     private final int stationAmount;
+    private final int[] shotsStationNumber;
 
     public int getPickAmount() {
         return pickAmount;
-    }
-
-    public int getShotPickAmount(int shotIndex) {
-        return shotsPickAmount[shotIndex];
     }
 
     public int getShotAmount() {
@@ -79,61 +76,99 @@ public class PicksTxt {
         return stationAmount;
     }
 
-    private PicksTxt(Path picksPath, int pickAmount, int[] shotsPickAmount, int shotAmount, Station[] stations, int stationAmount) {
+    public int[] getShotsStationsNumber() {
+        return shotsStationNumber;
+    }
+
+    private PicksTxt(Path picksPath, int pickAmount, int shotAmount, int stationAmount, Station[] stations, int[] shotsPickAmount, int[] shotsStationNumber) {
         this.picksPath = picksPath;
         this.pickAmount = pickAmount;
         this.shotsPickAmount = shotsPickAmount;
         this.shotAmount = shotAmount;
-        this.stations = stations;
         this.stationAmount = stationAmount;
+        this.stations = stations;
+        this.shotsStationNumber = shotsStationNumber;
     }
 
     public static PicksTxt open(Path picksPath) throws IOException, IllegalArgumentException {
         Locale.setDefault(Locale.US);
 
         int pickAmount = 0;
-        // Number of picks of each shot
-        List<Integer> shotsPickAmount = new ArrayList<>();
         int shotAmount;
-        List<Station> stations = new ArrayList<>();
         int stationAmount;
+        List<Integer> shotsPickAmount = new ArrayList<>();
+        List<Integer> shotsStationNumber = new ArrayList<>();
+        List<Station> stations = new ArrayList<>();
 
         // Iterate over the lines of the whole file to obtain the following information:
-        // - For each station: number, xy coordinates and elevation
-        // - For each shot: number of picks
+        // - Every station information: number, xy coordinates and elevation
+        // - Number of picks of each shot
+        // - Source station number of each shot
 
         try (Scanner scanner = new Scanner(Files.newBufferedReader(picksPath, StandardCharsets.US_ASCII))) {
 
             scanner.nextLine();  // Ignore headers line
 
-            int currentShotPickAmount = 0;
-            int prev_seqNum = 1;
-            int latest_recStat = 0;
+            // First pick of 1st shot
+
+            int seqNum = scanner.nextInt();  // FFID
+            int souStat = scanner.nextInt();  // SOU_SLOC
+            int recStat = scanner.nextInt();  // SRF_SLOC
+            scanner.next();  // Ignore FB_PICK
+            scanner.next();  // Ignore SOU_X
+            scanner.next();  // Ignore SOU_Y
+            float recX = scanner.nextFloat();  // REC_X
+            float recY = scanner.nextFloat();  // REC_Y
+            float recElev = scanner.nextFloat();  // REC_ELEV
+            scanner.nextLine();  // Ignore OFFSET and CDP
+
+            // Determine station number of each shot
+            shotsStationNumber.add(souStat);
+
+            // Determine stations
+            int latest_recStat = recStat;
+            Station station = new Station();
+            station.num = recStat;
+            station.x = recX;
+            station.y = recY;
+            station.elev = recElev;
+            stations.add(station);
+
+            // Determine pick amount of each shot
+            int prev_seqNum = seqNum;
+            int currentShotPickAmount = 1;
 
             while (scanner.hasNextLine()) {
 
-                int seqNum = scanner.nextInt();  // FFID
-                scanner.next();  // Ignore SOU_SLOC
-                int recStat = scanner.nextInt();  // SRF_SLOC
+                seqNum = scanner.nextInt();  // FFID
+                souStat = scanner.nextInt();  // SOU_SLOC
+                recStat = scanner.nextInt();  // SRF_SLOC
                 scanner.next();  // Ignore FB_PICK
                 scanner.next();  // Ignore SOU_X
                 scanner.next();  // Ignore SOU_Y
-                float recX = scanner.nextFloat();  // REC_X
-                float recY = scanner.nextFloat();  // REC_Y
-                float recElev = scanner.nextFloat();  // REC_ELEV
+                recX = scanner.nextFloat();  // REC_X
+                recY = scanner.nextFloat();  // REC_Y
+                recElev = scanner.nextFloat();  // REC_ELEV
                 scanner.nextLine();  // Ignore OFFSET and CDP
 
+                // Determine pick amount of each shot
+                // Determine station number of each shot
                 if (seqNum != prev_seqNum) {
+                    // First pick of new every new shot
                     prev_seqNum = seqNum;
+
+                    shotsStationNumber.add(souStat);
+
                     shotsPickAmount.add(currentShotPickAmount);
                     currentShotPickAmount = 1;
                 } else {
                     currentShotPickAmount++;
                 }
 
+                // Determine stations
                 if (recStat > latest_recStat) {
                     latest_recStat = recStat;
-                    Station station = new Station();
+                    station = new Station();
                     station.num = recStat;
                     station.x = recX;
                     station.y = recY;
@@ -157,12 +192,16 @@ public class PicksTxt {
         stationAmount = stations.size();
 
         System.out.println("\nTotal number of picks: " + pickAmount);
-        System.out.println("Number of picks at each shot: " + shotsPickAmount);
         System.out.println("Number of shots: " + shotAmount);
         System.out.println("Number of stations: " + stationAmount + '\n');
+        System.out.println("Number of picks at each shot: " + shotsPickAmount);
+        System.out.println("Station number of each shot:" + shotsStationNumber);
 
-        return new PicksTxt(picksPath, pickAmount, shotsPickAmount.stream().mapToInt(Integer::intValue).toArray(),
-                shotAmount, stations.toArray(new Station[0]), stationAmount);
+
+        return new PicksTxt(picksPath, pickAmount,
+                shotAmount, stationAmount, stations.toArray(new Station[0]),
+                shotsPickAmount.stream().mapToInt(Integer::intValue).toArray(),
+                shotsStationNumber.stream().mapToInt(Integer::intValue).toArray());
     }
 
     public PicksBin createPicksBin(Path picksBinPath) throws IOException, IllegalArgumentException {
