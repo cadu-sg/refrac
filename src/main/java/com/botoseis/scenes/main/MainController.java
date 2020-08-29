@@ -11,7 +11,9 @@ import com.botoseis.storage.Project;
 import com.botoseis.structs.Shot;
 import com.botoseis.structs.Station;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleIntegerProperty;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.geometry.Point2D;
@@ -30,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 public class MainController {
 
@@ -44,7 +47,7 @@ public class MainController {
     private InterpretationCalculator interpretationCalculator;
     private static final Path USER_HOME = Paths.get(System.getProperty("user.home"));
 
-    private int mainShotIndex;
+    private IntegerProperty mainShotIndex;
     private int amountLoadedShots;
     private int shotAmount;
 
@@ -138,6 +141,9 @@ public class MainController {
                 handleLineUnloaded();
             }
         });
+
+        mainShotIndex = new SimpleIntegerProperty();
+
         loadedShots = new ArrayList<>();
 
         toggleButton_symbols.selectedProperty().addListener((observable, oldValue, newValue) -> handleToggleSymbols());
@@ -181,7 +187,9 @@ public class MainController {
 
         layerChart = new LayerChart(line.getStations(), container_layerChart);
 
-        layerChart.enableGoToShotFeature(mainShotIndex, line.getShotsMetadata());
+        Consumer<Integer> changeLoadedShot = this::tryToChangeLoadedShot;
+
+        layerChart.enableGoToShotFeature(changeLoadedShot, line.getShotsMetadata());
 
         interpretationCalculator = new InterpretationCalculator(
                 pickChart.slope_head3L,
@@ -208,7 +216,7 @@ public class MainController {
         }
 
         shotAmount = line.getShotAmount();
-        mainShotIndex = 0;
+        mainShotIndex.set(0);
         amountLoadedShots = 1;
         updatePlot();
     }
@@ -301,20 +309,20 @@ public class MainController {
         loadedShots.clear();
         if (amountLoadedShots == 1) {
             // Loading a single shot
-            mainShot = line.loadShot(mainShotIndex);
+            mainShot = line.loadShot(mainShotIndex.get());
             loadedShots.add(mainShot);
             // Update labels
-            label_seqNum.setText(String.valueOf(mainShotIndex + 1));
+            label_seqNum.setText(String.valueOf(mainShotIndex.get() + 1));
             label_shotStat.setText(String.valueOf(mainShot.souStat));
         } else {
             // Loading two or more shots
-            int firstShotIndex = mainShotIndex - (amountLoadedShots - 1) / 2;
-            int lastShotIndex = mainShotIndex + (amountLoadedShots - 1) / 2;
+            int firstShotIndex = mainShotIndex.get() - (amountLoadedShots - 1) / 2;
+            int lastShotIndex = mainShotIndex.get() + (amountLoadedShots - 1) / 2;
             if (firstShotIndex < 0) firstShotIndex = 0;
             if (lastShotIndex >= shotAmount) lastShotIndex = shotAmount - 1;
             for (int shotIndex = firstShotIndex; shotIndex <= lastShotIndex; shotIndex++) {
                 Shot shot = line.loadShot(shotIndex);
-                if (shotIndex == mainShotIndex) {
+                if (shotIndex == mainShotIndex.get()) {
                     mainShot = shot;
                 }
                 loadedShots.add(shot);
@@ -327,7 +335,7 @@ public class MainController {
         label_shotCoordinates.setText(String.format("(%.2f, %.2f)", mainShot.souX, mainShot.souY));
 
         // Update text fields
-        textField_seqNum.setText(String.valueOf(mainShotIndex + 1));
+        textField_seqNum.setText(String.valueOf(mainShotIndex.get() + 1));
         textField_amountLoadedShots.setText(String.valueOf(amountLoadedShots));
     }
 
@@ -344,7 +352,7 @@ public class MainController {
     }
 
     private Optional<Point2D[]> loadFirstPreviousDrawPoints() throws IOException {
-        for (int shotIndex = mainShotIndex; shotIndex >= 0; shotIndex--) {
+        for (int shotIndex = mainShotIndex.get(); shotIndex >= 0; shotIndex--) {
             Point2D[] drawPoints = line.loadDrawPoints(shotIndex);
             if (isAnyPointDefined(drawPoints)) {
                 return Optional.of(drawPoints);
@@ -430,11 +438,11 @@ public class MainController {
     }
 
     private void saveMainShot() throws IOException {
-        line.saveShot(pickChart.getMainShot(), mainShotIndex);
+        line.saveShot(pickChart.getMainShot(), mainShotIndex.get());
     }
 
     private void saveLineDrawerPoints(Point2D[] drawPoints) throws IOException {
-        line.saveDrawPoints(drawPoints, mainShotIndex);
+        line.saveDrawPoints(drawPoints, mainShotIndex.get());
     }
 
     private void plotLayerThicknesses(double[] thicknesses) {
@@ -470,7 +478,7 @@ public class MainController {
         interpretation[19] = pickChart.intersection_head1R_head2R.getIntersection().getX();
         interpretation[20] = pickChart.intersection_head2R_head3R.getIntersection().getX();
 
-        line.saveLayerInterpretation(interpretation, mainShotIndex);
+        line.saveLayerInterpretation(interpretation, mainShotIndex.get());
     }
 
     private static boolean areDrawPointsEqual(Point2D[] points1, Point2D[] points2) {
@@ -610,16 +618,16 @@ public class MainController {
 
     @FXML
     public void onPreviousShot(ActionEvent event) {
-        if (mainShotIndex != 0) {
-            tryToChangeLoadedShot(mainShotIndex - 1);
+        if (mainShotIndex.get() != 0) {
+            tryToChangeLoadedShot(mainShotIndex.get() - 1);
         }
         event.consume();
     }
 
     @FXML
     public void onNextShot(ActionEvent event) {
-        if (mainShotIndex != shotAmount - 1) {
-            tryToChangeLoadedShot(mainShotIndex + 1);
+        if (mainShotIndex.get() != shotAmount - 1) {
+            tryToChangeLoadedShot(mainShotIndex.get() + 1);
         }
         event.consume();
     }
@@ -627,12 +635,12 @@ public class MainController {
     @FXML
     private void onGoToShot(ActionEvent event) {
         int givenIndex = Integer.parseInt(textField_seqNum.getText()) - 1;
-        if (givenIndex != mainShotIndex) {
+        if (givenIndex != mainShotIndex.get()) {
             // If the given index is not already loaded
-            if (givenIndex < 0 && mainShotIndex != 0) {
+            if (givenIndex < 0 && mainShotIndex.get() != 0) {
                 // If the given index is before the first and we are not on the first
                 givenIndex = 0;
-            } else if (givenIndex > shotAmount - 1 && mainShotIndex != shotAmount - 1) {
+            } else if (givenIndex > shotAmount - 1 && mainShotIndex.get() != shotAmount - 1) {
                 // If the given index is after the last and we are not on the last
                 givenIndex = shotAmount - 1;
             }
@@ -643,16 +651,16 @@ public class MainController {
 
     private void tryToChangeLoadedShot(int shotIndex) {
         if (areDrawPointsEqualToLastSaved()) {
-            mainShotIndex = shotIndex;
+            mainShotIndex.set(shotIndex);
             updatePlot();
         } else {
             new SaveAlert().showAndWait().ifPresent(buttonType -> {
                 if (buttonType == SaveAlert.DO_NOT_SAVE) {
-                    mainShotIndex = shotIndex;
+                    mainShotIndex.set(shotIndex);
                     updatePlot();
                 } else if (buttonType == SaveAlert.SAVE) {
                     savePlot();
-                    mainShotIndex = shotIndex;
+                    mainShotIndex.set(shotIndex);
                     updatePlot();
                 }
             });

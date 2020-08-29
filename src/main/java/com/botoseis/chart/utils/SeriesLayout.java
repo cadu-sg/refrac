@@ -1,6 +1,5 @@
 package com.botoseis.chart.utils;
 
-import javafx.collections.ObservableList;
 import javafx.scene.Node;
 import javafx.scene.chart.XYChart;
 

@@ -15,6 +15,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.StackPane;
 
 import java.util.Arrays;
+import java.util.function.Consumer;
 
 public final class LayerChart {
 
@@ -73,18 +74,19 @@ public final class LayerChart {
         SeriesLayout.setSymbolsSize(surface, 0.0);
     }
 
-    public void enableGoToShotFeature(int mainShotIndex, ShotMetadata[] shotsMetadata) {
+    public void enableGoToShotFeature(Consumer<Integer> changeLoadedShot, ShotMetadata[] shotsMetadata) {
 
         double[] shotsSouX = Arrays.stream(shotsMetadata).mapToDouble(shot -> shot.souX).toArray();
 
         chartPane.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> {
             double selectedX = mouseEventToDataXValue(event);
 
-            int nearestStationShotIndex = getNearestValueIndex(selectedX, shotsSouX);
-            int nearestStationNumber = shotsMetadata[nearestStationShotIndex].souStat;
+            int nearestShotIndex = getNearestValueIndex(selectedX, shotsSouX);
 
             System.out.println(selectedX);
-            System.out.println("nearest station number " + nearestStationNumber);
+            System.out.println("nearest shot index " + nearestShotIndex);
+            changeLoadedShot.accept(nearestShotIndex);
+
             event.consume();
         });
     }
