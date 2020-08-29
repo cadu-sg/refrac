@@ -98,8 +98,8 @@ public final class Line {
                 Paths.get(homeDir.toString(), "draw_points.bin"), shotAmount);
 
         // Interpretations CSV file
-        InterpretationsCSV interpretationsCSV = new InterpretationsCSV(
-                Paths.get(homeDir.toString(), "interpretations.csv"), shotAmount);
+        InterpretationsCSV interpretationsCSV = InterpretationsCSV.create(
+                Paths.get(homeDir.toString(), "interpretations.csv"), shotAmount, picksTxt.getShotsStationsNumber());
 
         return new Line(homeDir, picksTxt, picksBin, drawPointsBin, interpretationsCSV);
     }
@@ -116,7 +116,7 @@ public final class Line {
                 Paths.get(homeDir.toString(), "draw_points.bin"));
 
         int shotAmount = picksTxt.getShotAmount();
-        InterpretationsCSV interpretationsCSV = new InterpretationsCSV(
+        InterpretationsCSV interpretationsCSV = InterpretationsCSV.open(
                 Paths.get(homeDir.toString(), "interpretations.csv"), shotAmount);
 
         return new Line(homeDir, picksTxt, picksBin, drawPointsBin, interpretationsCSV);

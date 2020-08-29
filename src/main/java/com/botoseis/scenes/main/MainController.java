@@ -216,14 +216,15 @@ public class MainController {
         double[][] interpretations = line.loadAllInterpretations();
 
         Arrays.stream(interpretations).forEach(interpretation -> {
-            int souStat = (int) interpretation[0];
-            double layer1_thickness = interpretation[1];
-            double layer2_thickness = interpretation[2];
-            double layer3_thickness = interpretation[3];
 
-            if (souStat != UNDEFINED) {
+            int souStat = (int) interpretation[1];
+            double layer1_thickness = interpretation[2];
+            double layer2_thickness = interpretation[3];
+            double layer3_thickness = interpretation[4];
+
+            if (layer1_thickness != UNDEFINED) {
                 Station station = getStationByNumber(souStat);
-                if (souStat != UNDEFINED && station != null) {
+                if (station != null) {
                     layerChart.plotLayerThickness(
                             new double[]{layer1_thickness, layer2_thickness, layer3_thickness}, station);
                 }
@@ -443,34 +444,29 @@ public class MainController {
     }
 
     private void saveLayerInterpretation(double[] thicknesses, double[] velocities) throws IOException {
-        double[] interpretation = new double[24];
+        double[] interpretation = new double[21];
 
-        interpretation[0] = mainShot.souStat;
-
-        interpretation[1] = thicknesses[0];
-        interpretation[2] = thicknesses[1];
-        interpretation[3] = thicknesses[2];
-
-        interpretation[4] = velocities[0];
-        interpretation[5] = velocities[1];
-        interpretation[6] = velocities[2];
-        interpretation[7] = 0;
+        interpretation[0] = mainShot.seqNum;
+        interpretation[1] = mainShot.souStat;
+        interpretation[2] = thicknesses[0];
+        interpretation[3] = thicknesses[1];
+        interpretation[4] = thicknesses[2];
+        interpretation[5] = velocities[0];
+        interpretation[6] = velocities[1];
+        interpretation[7] = velocities[2];
         interpretation[8] = 0;
-        interpretation[9] = 0;
-        interpretation[10] = 0;
-        interpretation[11] = 0;
-        interpretation[12] = pickChart.intercept_head3L.get();
-        interpretation[13] = pickChart.intercept_head2L.get();
-        interpretation[14] = pickChart.intercept_head1L.get();
-        interpretation[15] = pickChart.intercept_head1R.get();
-        interpretation[16] = pickChart.intercept_head2R.get();
-        interpretation[17] = pickChart.intercept_head3R.get();
-        interpretation[18] = pickChart.intersection_head3L_head2L.getIntersection().getX();
-        interpretation[19] = pickChart.intersection_head2L_head1L.getIntersection().getX();
-        interpretation[20] = pickChart.intersection_head1L_directL.getIntersection().getX();
-        interpretation[21] = pickChart.intersection_directR_head1R.getIntersection().getX();
-        interpretation[22] = pickChart.intersection_head1R_head2R.getIntersection().getX();
-        interpretation[23] = pickChart.intersection_head2R_head3R.getIntersection().getX();
+        interpretation[9] = pickChart.intercept_head3L.get();
+        interpretation[10] = pickChart.intercept_head2L.get();
+        interpretation[11] = pickChart.intercept_head1L.get();
+        interpretation[12] = pickChart.intercept_head1R.get();
+        interpretation[13] = pickChart.intercept_head2R.get();
+        interpretation[14] = pickChart.intercept_head3R.get();
+        interpretation[15] = pickChart.intersection_head3L_head2L.getIntersection().getX();
+        interpretation[16] = pickChart.intersection_head2L_head1L.getIntersection().getX();
+        interpretation[17] = pickChart.intersection_head1L_directL.getIntersection().getX();
+        interpretation[18] = pickChart.intersection_directR_head1R.getIntersection().getX();
+        interpretation[19] = pickChart.intersection_head1R_head2R.getIntersection().getX();
+        interpretation[20] = pickChart.intersection_head2R_head3R.getIntersection().getX();
 
         line.saveLayerInterpretation(interpretation, mainShotIndex);
     }

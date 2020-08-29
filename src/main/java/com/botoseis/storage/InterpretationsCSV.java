@@ -11,21 +11,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Provides methods for saving or loading a double matrix as a CSV file with predefined headers and number of columns.
- * This matrix should be the intepretations matrix, which stores shot intepretation results at each line.
+ * This matrix should be the interpretations matrix, which stores shot interpretation results at each line.
  *
  * @author Carlos Eduardo
  */
 public class InterpretationsCSV {
 
-    public static final int NUMBER_OF_INTERPRETATION_ELEMENTS = 24;
-    public static final CSVFormat CSV_FORMAT = CSVFormat.DEFAULT.withHeader(
-            "index", "sourceStation", "z1", "z2", "z3",
-            "v0", "v1", "v2", "v3", "nada", "nada", "nada", "nada",
-            "t3L", "t2L", "t1L", "t1R", "t2R", "t3R",
+    public static final CSVFormat CSV_FORMAT_CREATE_HEADER = CSVFormat.DEFAULT.withHeader(
+            "sequentialNumber", "sourceStation", "z1", "z2", "z3",
+            "v0", "v1", "v2", "v3", "t3L", "t2L", "t1L", "t1R", "t2R", "t3R",
             "x3L", "x2L", "x1L", "x1R", "x2R", "x3R");
+    public static final CSVFormat CSV_FORMAT_SKIP_HEADER = CSVFormat.DEFAULT.withFirstRecordAsHeader();
+
+    public static final int NUMBER_OF_INTERPRETATION_ELEMENTS = 21;
 
     private final Path interpretationsPath;
     private final int shotAmount;
@@ -35,12 +37,30 @@ public class InterpretationsCSV {
         this.shotAmount = shotAmount;
     }
 
-    public static void saveAll(double[][] interpretations, Path interpretationsPath) throws IOException {
-        try (CSVPrinter csvPrinter = new CSVPrinter(Files.newBufferedWriter(interpretationsPath, StandardCharsets.US_ASCII), CSV_FORMAT)) {
-            for (int shotIndex = 0; shotIndex < interpretations.length; shotIndex++) {
+    public static InterpretationsCSV create(Path interpretationsPath, int shotAmount, int[] shotsStationNumber) throws IOException {
+        try (CSVPrinter csvPrinter = new CSVPrinter(Files.newBufferedWriter(interpretationsPath, StandardCharsets.US_ASCII), CSV_FORMAT_CREATE_HEADER)) {
+            for (int shotIndex = 0; shotIndex < shotAmount; shotIndex++) {
                 csvPrinter.print(shotIndex);
-                csvPrinter.print((int) interpretations[shotIndex][0]);  // souStat
-                csvPrinter.printRecord(Arrays.stream(interpretations[shotIndex]).skip(1).boxed().collect(Collectors.toList()));
+                csvPrinter.print(shotsStationNumber[shotIndex]);
+                csvPrinter.printRecord(IntStream.generate(() -> 0).limit(NUMBER_OF_INTERPRETATION_ELEMENTS - 2).boxed().collect(Collectors.toList()));
+                csvPrinter.flush();
+            }
+        } catch (IOException e) {
+            throw new IOException("Unable to create interpretations file", e);
+        }
+        return new InterpretationsCSV(interpretationsPath, shotAmount);
+    }
+
+    public static InterpretationsCSV open(Path interpretationsPath, int shotAmount) {
+        return new InterpretationsCSV(interpretationsPath, shotAmount);
+    }
+
+    private void saveAll(double[][] interpretations) throws IOException, IllegalArgumentException {
+        try (CSVPrinter csvPrinter = new CSVPrinter(Files.newBufferedWriter(interpretationsPath, StandardCharsets.US_ASCII), CSV_FORMAT_CREATE_HEADER)) {
+            for (double[] interpretation : interpretations) {
+                csvPrinter.print((int) interpretation[0]);
+                csvPrinter.print((int) interpretation[1]);
+                csvPrinter.printRecord(Arrays.stream(interpretation).skip(2).boxed().collect(Collectors.toList()));
                 csvPrinter.flush();
             }
         } catch (IOException e) {
@@ -51,21 +71,19 @@ public class InterpretationsCSV {
     /**
      * Reads the interpretations CSV file
      *
-     * @param shotAmount          number of shots
-     * @param interpretationsPath path to the interpretations file
      * @return interpretations matrix
      * @throws IOException Input error
      */
-    public static double[][] loadAll(int shotAmount, Path interpretationsPath) throws IOException {
+    private double[][] loadAll() throws IOException {
         if (!Files.exists(interpretationsPath)) {
             return new double[shotAmount][NUMBER_OF_INTERPRETATION_ELEMENTS];
         }
-        try (CSVParser csvParser = CSVParser.parse(interpretationsPath, StandardCharsets.US_ASCII, CSVFormat.DEFAULT.withFirstRecordAsHeader())) {
+        try (CSVParser csvParser = CSVParser.parse(interpretationsPath, StandardCharsets.US_ASCII, CSV_FORMAT_SKIP_HEADER)) {
             double[][] interpretations = new double[shotAmount][NUMBER_OF_INTERPRETATION_ELEMENTS];
             int shotIndex = 0;
             for (CSVRecord csvRecord : csvParser) {
                 for (int i = 0; i < NUMBER_OF_INTERPRETATION_ELEMENTS; i++) {
-                    interpretations[shotIndex][i] = Double.parseDouble(csvRecord.get(i + 1));
+                    interpretations[shotIndex][i] = Double.parseDouble(csvRecord.get(i));
                 }
                 shotIndex++;
             }
@@ -76,15 +94,13 @@ public class InterpretationsCSV {
     }
 
     public void saveInterpretation(double[] interpretation, int shotIndex) throws IOException {
-        double[][] interpretations = loadAll(shotAmount, interpretationsPath);
-
+        double[][] interpretations = loadAll();
         interpretations[shotIndex] = interpretation;
-
-        saveAll(interpretations, interpretationsPath);
+        saveAll(interpretations);
     }
 
     public double[][] loadAllInterpretations() throws IOException {
-        return loadAll(shotAmount, interpretationsPath);
+        return loadAll();
     }
 
 }
