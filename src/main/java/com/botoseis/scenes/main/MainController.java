@@ -187,9 +187,7 @@ public class MainController {
 
         layerChart = new LayerChart(line.getStations(), container_layerChart);
 
-        Consumer<Integer> changeLoadedShot = this::tryToChangeLoadedShot;
-
-        layerChart.enableGoToShotFeature(changeLoadedShot, line.getShotsMetadata());
+        layerChart.enableGoToShotFeature(this::tryToChangeLoadedShot, line.getShotsMetadata());
 
         interpretationCalculator = new InterpretationCalculator(
                 pickChart.slope_head3L,
