@@ -462,7 +462,7 @@ public class MainController {
         interpretation[5] = velocities[0];
         interpretation[6] = velocities[1];
         interpretation[7] = velocities[2];
-        interpretation[8] = 0;
+        interpretation[8] = velocities[3];
         interpretation[9] = pickChart.intercept_head3L.get();
         interpretation[10] = pickChart.intercept_head2L.get();
         interpretation[11] = pickChart.intercept_head1L.get();

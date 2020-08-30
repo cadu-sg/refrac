@@ -127,14 +127,16 @@ public class InterpretationCalculator {
 
             double[] results1 = computeThicknessLayer1(v1, va2, vb2, t2);
             double[] results2 = computeThicknessLayer2(v1, va3, vb3, t3, results1);
+            double[] results3 = computeThicknessLayer3(v1, va4, vb4, t4, results1, results2);
 
             thickness1 = results1[0];
             thickness2 = results2[0];
-            thickness3 = computeThicknessLayer3(v1, va4, vb4, t4, results1, results2);
+            thickness3 = results3[0];
 
             velocity0 = v1;
             velocity1 = results1[1];
             velocity2 = results2[1];
+            velocity3 = results3[1];
 
         } else if (interpretation1Available && interpretation2Available) {
 
@@ -163,6 +165,7 @@ public class InterpretationCalculator {
             velocity0 = v1;
             velocity1 = results1[1];
             velocity2 = results2[1];
+            velocity3 = UNDEFINED;
 
         } else if (interpretation1Available) {
 
@@ -184,6 +187,7 @@ public class InterpretationCalculator {
             velocity0 = v1;
             velocity1 = results1[1];
             velocity2 = UNDEFINED;
+            velocity3 = UNDEFINED;
 
         } else {
             thickness1 = UNDEFINED;
@@ -201,7 +205,7 @@ public class InterpretationCalculator {
     }
 
     public double[] getVelocities() {
-        return new double[]{velocity0, velocity1, velocity2};
+        return new double[]{velocity0, velocity1, velocity2, velocity3};
     }
 
     private boolean interpretation1Available() {
@@ -307,7 +311,7 @@ public class InterpretationCalculator {
      * @param results2 double array containing h2 (m), v3 (m/2) and w3 (rad)
      * @return h3 (m)
      */
-    public static double computeThicknessLayer3(double v1, double va4, double vb4, double t4, double[] results1, double[] results2) {
+    public static double[] computeThicknessLayer3(double v1, double va4, double vb4, double t4, double[] results1, double[] results2) {
         double h1 = results1[0];
         double v2 = results1[1];
         double w2 = results1[2];
@@ -337,9 +341,17 @@ public class InterpretationCalculator {
         double alpha3_3 = P3_3 + w3;
         double beta3_3 = Q3_3 - w3;
 
-        return (v3 / (Math.cos(alpha3_3) + Math.cos(beta3_3))) *
+        double h3 = (v3 / (Math.cos(alpha3_3) + Math.cos(beta3_3))) *
                 (t4 - ((h1 * (Math.cos(alpha1_3) + Math.cos(beta1_3)) / v1) +
                         (h2 * (Math.cos(alpha2_3) + Math.cos(beta2_3)) / v2)));
+
+        double a3_3 = (alpha3_3 + beta3_3) / 2;
+
+        double v4 = v3 / Math.sin(a3_3);
+
+        double w4 = (alpha3_3 - beta3_3) / 2;
+
+        return new double[]{h3, v4, w4};
     }
 
 }
