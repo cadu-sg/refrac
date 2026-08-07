@@ -126,7 +126,7 @@ public class PicksBin {
             pick.recElev = byteBuffer.getFloat();
             pick.offset = byteBuffer.getFloat();
             pick.cdp = byteBuffer.getInt();
-            pick.waveType = byteBuffer.getInt();
+            pick.waveType = byteBuffer.getFloat();
             shot.picks[i] = pick;
         }
 
