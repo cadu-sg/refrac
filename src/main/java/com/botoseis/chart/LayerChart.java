@@ -53,6 +53,9 @@ public final class LayerChart {
         xAxis = new NumberAxis();
         yAxis = new NumberAxis();
         xAxis.setSide(Side.TOP);
+        // Coordinates (e.g. UTM) and elevations are far from zero: fit the range to the data
+        xAxis.setForceZeroInRange(false);
+        yAxis.setForceZeroInRange(false);
 
         // Chart
         LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
