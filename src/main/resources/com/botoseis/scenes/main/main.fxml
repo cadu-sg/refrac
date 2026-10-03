@@ -104,8 +104,8 @@
             <TextField fx:id="textField_amountLoadedShots" onAction="#onSetAmountLoadedShots" prefWidth="40.0" />
             <Button mnemonicParsing="false" onAction="#onSetAmountLoadedShots" text="Apply" />
             <Separator orientation="VERTICAL" />
-            <ToggleButton fx:id="toggleButton_zoom" mnemonicParsing="false" text="Z" />
-            <ToggleButton fx:id="toggleButton_eraser" mnemonicParsing="false" text="E" />
+            <ToggleButton fx:id="toggleButton_zoom" mnemonicParsing="false" text="Zoom" />
+            <ToggleButton fx:id="toggleButton_eraser" mnemonicParsing="false" text="Erase picks" />
         </items>
       </ToolBar>
       <SplitPane dividerPositions="0.3" VBox.vgrow="ALWAYS">
