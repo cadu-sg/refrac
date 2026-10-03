@@ -1,0 +1,11 @@
+[tools]
+python = "3.14"
+uv = "latest"
+
+[settings]
+# Activate the uv-managed .venv when entering the project
+python.uv_venv_auto = true
+
+[env]
+# uv must use the Python provided by mise, never a downloaded one
+UV_PYTHON_DOWNLOADS = "never"
