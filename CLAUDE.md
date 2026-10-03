@@ -56,7 +56,7 @@ JavaFX properties, not method calls, are the glue. `LineDrawer` exposes `slopePr
 - `InterpretationCalculator` holds the 8 slope + 6 intercept properties and reads them on demand in `computeAvailableInterpretations()`.
 - `VelocitiesLegend` listens to the slopes and updates its overlay grid live.
 - `IntersectionDetector` listens to two drawers' `drawn` properties and recomputes their intersection; `VerticalMarkerGenerator` listens to *that* and adds/removes a vertical marker on the chart.
-- `LineFit*` classes listen to `drawn` to add/remove their "Fit …" button from the sidebar; pressing one runs a least-squares fit (`math/LinearRegression`) over the picks between computed x-bounds and snaps the drawer to it.
+- `LineFit*` classes run a least-squares fit (`math/LinearRegression`) over the picks between computed x-bounds and snap the drawer to it. `PickChart.enableLineFit()` wires them to the per-wave "Fit" buttons in the Interpretation grid (disabled until the drawer is `drawn`) and to "Fit all" (fits inside-out: direct → head1 → head2 → head3); the F key (`MainController.handleFitShortcut`) fits the line whose radio button is selected.
 - `MainController` binds the toolbar toggles and interpretation radio buttons *bidirectionally* to the drawers' `enabled` properties; `PickChart.ensureSingleTrue()` enforces that at most one tool (zoom, eraser, or one drawer) is active.
 
 ### `UNDEFINED = 0`

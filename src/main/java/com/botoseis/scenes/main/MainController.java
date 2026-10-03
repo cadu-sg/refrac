@@ -19,6 +19,8 @@ import javafx.fxml.FXML;
 import javafx.geometry.Point2D;
 import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -70,8 +72,6 @@ public class MainController {
     private StackPane container_layerChart;
     @FXML
     private GridPane container_layout;
-    @FXML
-    private VBox container_lineFit;
 
     @FXML
     private Label label_seqNum;
@@ -122,6 +122,24 @@ public class MainController {
     private RadioButton radioButton_refraction2R;
     @FXML
     private RadioButton radioButton_refraction3R;
+    @FXML
+    private Button button_fitRefraction3L;
+    @FXML
+    private Button button_fitRefraction2L;
+    @FXML
+    private Button button_fitRefraction1L;
+    @FXML
+    private Button button_fitDirectL;
+    @FXML
+    private Button button_fitDirectR;
+    @FXML
+    private Button button_fitRefraction1R;
+    @FXML
+    private Button button_fitRefraction2R;
+    @FXML
+    private Button button_fitRefraction3R;
+    @FXML
+    private Button button_fitAll;
 
     @FXML
     public void initialize() {
@@ -154,6 +172,25 @@ public class MainController {
 
         colorPicker_symbols.setValue(Color.valueOf(symbolColor));
         colorPicker_lines.setValue(Color.valueOf(lineColor));
+
+        // The F key fits the line selected for drawing. Registered once on the scene,
+        // so it works regardless of which node has focus, except text inputs
+        container_pickChart.sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                newScene.addEventHandler(KeyEvent.KEY_PRESSED, this::handleFitShortcut);
+            }
+        });
+    }
+
+    private void handleFitShortcut(KeyEvent event) {
+        if (event.getCode() != KeyCode.F || pickChart == null || container_interpretation.isDisabled()) {
+            return;
+        }
+        if (container_pickChart.getScene().getFocusOwner() instanceof TextInputControl) {
+            return;
+        }
+        pickChart.fitSelected();
+        event.consume();
     }
 
     private void handleProjectLoaded() {
@@ -172,7 +209,7 @@ public class MainController {
     private void handleLineLoaded() {
         setDisableLineLoadedNodes(false);
 
-        pickChart = new PickChart(container_pickChart, container_lineFit);
+        pickChart = new PickChart(container_pickChart);
 
         pickChart.enableFeatures(
                 toggleButton_zoom.selectedProperty(), toggleButton_eraser.selectedProperty(),
@@ -184,6 +221,11 @@ public class MainController {
                 radioButton_refraction1R.selectedProperty(),
                 radioButton_refraction2R.selectedProperty(),
                 radioButton_refraction3R.selectedProperty());
+
+        pickChart.enableLineFit(
+                button_fitRefraction3L, button_fitRefraction2L, button_fitRefraction1L, button_fitDirectL,
+                button_fitDirectR, button_fitRefraction1R, button_fitRefraction2R, button_fitRefraction3R,
+                button_fitAll);
 
         layerChart = new LayerChart(line.getStations(), container_layerChart);
 
@@ -276,7 +318,6 @@ public class MainController {
         container_toolbar.setDisable(value);
         container_layout.setDisable(value);
         container_interpretation.setDisable(value);
-        container_lineFit.getChildren().clear();
     }
 
     /**

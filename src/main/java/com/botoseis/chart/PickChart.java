@@ -4,6 +4,7 @@ import com.botoseis.chart.utils.Eraser;
 import com.botoseis.chart.utils.SeriesLayout;
 import com.botoseis.chart.utils.Zoom;
 import com.botoseis.chart.utils.linedrawer.*;
+import com.botoseis.chart.utils.linedrawer.fit.LineFit;
 import com.botoseis.chart.utils.linedrawer.fit.LineFitEdgy;
 import com.botoseis.chart.utils.linedrawer.fit.LineFitOriginFixed;
 import com.botoseis.chart.utils.linedrawer.fit.LineFitTwoIntersections;
@@ -11,14 +12,15 @@ import com.botoseis.chart.utils.marker.LineChartWithMarkers;
 import com.botoseis.chart.utils.marker.VerticalMarkerGenerator;
 import com.botoseis.structs.Pick;
 import com.botoseis.structs.Shot;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.collections.ObservableList;
 import javafx.geometry.Point2D;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.Button;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,7 +70,16 @@ public final class PickChart {
     public final IntersectionDetector intersection_head1R_head2R;
     public final IntersectionDetector intersection_head2R_head3R;
 
-    public PickChart(StackPane chartPane, VBox lineFitContainer) {
+    private final LineFit fit_head3L;
+    private final LineFit fit_head2L;
+    private final LineFit fit_head1L;
+    private final LineFit fit_directL;
+    private final LineFit fit_directR;
+    private final LineFit fit_head1R;
+    private final LineFit fit_head2R;
+    private final LineFit fit_head3R;
+
+    public PickChart(StackPane chartPane) {
 
         // Series and Data
         XYChart.Series<Number, Number> series = new XYChart.Series<>();
@@ -150,30 +161,22 @@ public final class PickChart {
         new VerticalMarkerGenerator(chart, intersection_head2R_head3R);
 
         // Line fit
-        new LineFitEdgy(drawer_head3L, pickDataList,
-                intersection_head3L_head2L,
-                lineFitContainer, "Fit refraction 3 left");
-        new LineFitTwoIntersections(drawer_head2L, pickDataList,
-                intersection_head3L_head2L, intersection_head2L_head1L,
-                lineFitContainer, "Fit refraction 2 left");
-        new LineFitTwoIntersections(drawer_head1L, pickDataList,
-                intersection_head2L_head1L, intersection_head1L_directL,
-                lineFitContainer, "Fit refraction 1 left");
-        new LineFitOriginFixed(drawer_directL, pickDataList,
-                intersection_head1L_directL,
-                lineFitContainer, "Fit direct 1 left");
-        new LineFitOriginFixed(drawer_directR, pickDataList,
-                intersection_directR_head1R,
-                lineFitContainer, "Fit direct 1 right");
-        new LineFitTwoIntersections(drawer_head1R, pickDataList,
-                intersection_directR_head1R, intersection_head1R_head2R,
-                lineFitContainer, "Fit refraction 1 right");
-        new LineFitTwoIntersections(drawer_head2R, pickDataList,
-                intersection_head1R_head2R, intersection_head2R_head3R,
-                lineFitContainer, "Fit refraction 2 right");
-        new LineFitEdgy(drawer_head3R, pickDataList,
-                intersection_head2R_head3R,
-                lineFitContainer, "Fit refraction 3 right");
+        fit_head3L = new LineFitEdgy(drawer_head3L, pickDataList,
+                intersection_head3L_head2L);
+        fit_head2L = new LineFitTwoIntersections(drawer_head2L, pickDataList,
+                intersection_head3L_head2L, intersection_head2L_head1L);
+        fit_head1L = new LineFitTwoIntersections(drawer_head1L, pickDataList,
+                intersection_head2L_head1L, intersection_head1L_directL);
+        fit_directL = new LineFitOriginFixed(drawer_directL, pickDataList,
+                intersection_head1L_directL);
+        fit_directR = new LineFitOriginFixed(drawer_directR, pickDataList,
+                intersection_directR_head1R);
+        fit_head1R = new LineFitTwoIntersections(drawer_head1R, pickDataList,
+                intersection_directR_head1R, intersection_head1R_head2R);
+        fit_head2R = new LineFitTwoIntersections(drawer_head2R, pickDataList,
+                intersection_head1R_head2R, intersection_head2R_head3R);
+        fit_head3R = new LineFitEdgy(drawer_head3R, pickDataList,
+                intersection_head2R_head3R);
     }
 
     public void plot(Shot shot) {
@@ -230,6 +233,70 @@ public final class PickChart {
         ensureSingleTrue(toggle_zoom, toggle_eraser,
                 toggle_head3L, toggle_head2L, toggle_head1L, toggle_directL,
                 toggle_directR, toggle_head1R, toggle_head2R, toggle_head3R);
+    }
+
+    public void enableLineFit(
+            Button button_head3L, Button button_head2L, Button button_head1L, Button button_directL,
+            Button button_directR, Button button_head1R, Button button_head2R, Button button_head3R,
+            Button button_fitAll) {
+
+        bindFitButton(button_head3L, fit_head3L);
+        bindFitButton(button_head2L, fit_head2L);
+        bindFitButton(button_head1L, fit_head1L);
+        bindFitButton(button_directL, fit_directL);
+        bindFitButton(button_directR, fit_directR);
+        bindFitButton(button_head1R, fit_head1R);
+        bindFitButton(button_head2R, fit_head2R);
+        bindFitButton(button_head3R, fit_head3R);
+
+        button_fitAll.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> !(drawer_head3L.isDrawn() || drawer_head2L.isDrawn() || drawer_head1L.isDrawn()
+                        || drawer_directL.isDrawn() || drawer_directR.isDrawn() || drawer_head1R.isDrawn()
+                        || drawer_head2R.isDrawn() || drawer_head3R.isDrawn()),
+                drawer_head3L.drawnProperty(), drawer_head2L.drawnProperty(),
+                drawer_head1L.drawnProperty(), drawer_directL.drawnProperty(),
+                drawer_directR.drawnProperty(), drawer_head1R.drawnProperty(),
+                drawer_head2R.drawnProperty(), drawer_head3R.drawnProperty()));
+        button_fitAll.setOnAction(event -> {
+            fitAll();
+            event.consume();
+        });
+    }
+
+    private static void bindFitButton(Button button, LineFit lineFit) {
+        button.disableProperty().bind(lineFit.getLineDrawer().drawnProperty().not());
+        button.setOnAction(event -> {
+            lineFit.fit();
+            event.consume();
+        });
+    }
+
+    /**
+     * Fits every drawn line, from the shot outwards, since each line's fit range
+     * depends on its intersection with the inner neighbour
+     */
+    public void fitAll() {
+        fit_directL.fit();
+        fit_head1L.fit();
+        fit_head2L.fit();
+        fit_head3L.fit();
+        fit_directR.fit();
+        fit_head1R.fit();
+        fit_head2R.fit();
+        fit_head3R.fit();
+    }
+
+    /**
+     * Fits the line currently selected for drawing, if it has been drawn
+     */
+    public void fitSelected() {
+        for (LineFit lineFit : new LineFit[]{fit_head3L, fit_head2L, fit_head1L, fit_directL,
+                fit_directR, fit_head1R, fit_head2R, fit_head3R}) {
+            if (lineFit.getLineDrawer().isEnabled()) {
+                lineFit.fit();
+                return;
+            }
+        }
     }
 
     private void ensureSingleTrue(BooleanProperty... booleanProperties) {

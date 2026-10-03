@@ -4,59 +4,35 @@ import com.botoseis.chart.utils.linedrawer.LineDrawer;
 import com.botoseis.math.LinearRegression;
 import javafx.collections.ObservableList;
 import javafx.scene.chart.XYChart;
-import javafx.scene.control.Button;
-import javafx.scene.layout.Pane;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
-abstract class LineFit {
+public abstract class LineFit {
 
     protected static final double[] UNDEFINED = new double[]{0, 0};
 
     private final LineDrawer lineDrawer;
     private final ObservableList<XYChart.Data<Number, Number>> dataList;
-    private final Pane lineFitNodeContainer;
-    private final LineFitNode lineFitNode;
 
     protected LineFit(LineDrawer lineDrawer,
-                      ObservableList<XYChart.Data<Number, Number>> dataList,
-                      Pane lineFitNodeContainer,
-                      String text) {
+                      ObservableList<XYChart.Data<Number, Number>> dataList) {
         this.lineDrawer = lineDrawer;
         this.dataList = dataList;
-        this.lineFitNodeContainer = lineFitNodeContainer;
-        this.lineFitNode = new LineFitNode(text);
-        lineDrawer.drawnProperty().addListener((observable, oldValue, newValue) -> {
-            if (newValue) {
-                addGUI();
-            } else {
-                removeGUI();
-            }
-        });
     }
 
-    private void removeGUI() {
-        this.lineFitNodeContainer.getChildren().remove(lineFitNode);
+    public final LineDrawer getLineDrawer() {
+        return lineDrawer;
     }
 
-    private void addGUI() {
-        this.lineFitNodeContainer.getChildren().add(lineFitNode);
+    public final boolean canFit() {
+        return lineDrawer.isDrawn();
     }
 
-    private class LineFitNode extends Button {
-        public LineFitNode(String text) {
-            this.setMaxWidth(Double.MAX_VALUE);
-            this.setText(text);
-            this.setStyle("-fx-text-fill: " + lineDrawer.getColor() + ";");
-            this.setOnAction(event -> {
-                handleFit();
-                event.consume();
-            });
+    public final void fit() {
+        if (!canFit()) {
+            return;
         }
-    }
-
-    protected final void handleFit() {
         double[] lineFitBounds = computeLineFitBounds();
         double startX = lineFitBounds[0];
         double endX = lineFitBounds[1];

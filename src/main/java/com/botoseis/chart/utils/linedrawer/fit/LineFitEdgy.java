@@ -4,7 +4,6 @@ import com.botoseis.chart.utils.linedrawer.IntersectionDetector;
 import com.botoseis.chart.utils.linedrawer.LineDrawer;
 import javafx.collections.ObservableList;
 import javafx.scene.chart.XYChart;
-import javafx.scene.layout.Pane;
 
 public final class LineFitEdgy extends LineFit {
     private final LineDrawer lineDrawer;
@@ -13,10 +12,8 @@ public final class LineFitEdgy extends LineFit {
     public LineFitEdgy(
             LineDrawer lineDrawer,
             ObservableList<XYChart.Data<Number, Number>> dataList,
-            IntersectionDetector intersection,
-            Pane lineFitContainer,
-            String title) {
-        super(lineDrawer, dataList, lineFitContainer, title);
+            IntersectionDetector intersection) {
+        super(lineDrawer, dataList);
         this.lineDrawer = lineDrawer;
         this.intersection = intersection;
     }
