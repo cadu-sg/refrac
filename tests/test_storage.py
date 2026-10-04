@@ -95,17 +95,20 @@ def test_missing_interpretations_file_reads_as_zeros(line):
     assert Line.open(line.home_dir).load_all_interpretations() == [[0.0] * 21] * 25
 
 
+_PICKS_HEADER = "FFID SOU_SLOC SRF_SLOC FB_PICK SOU_X SOU_Y REC_X REC_Y REC_ELEV OFFSET CDP"
+
+
 def test_invalid_picks_files(tmp_path):
     with pytest.raises(ValueError, match="no such file"):
         PicksTxt.open(tmp_path / "missing.dat")
 
     short_row = tmp_path / "short.dat"
-    short_row.write_text("header\n1 101 101 0.0 1 2 3\n")
+    short_row.write_text(f"{_PICKS_HEADER}\n1 101 101 0.0 1 2 3\n")
     with pytest.raises(ValueError, match="invalid line 2"):
         PicksTxt.open(short_row)
 
     no_source_station = tmp_path / "no_source.dat"
-    no_source_station.write_text("header\n1 100 101 0.0 0 0 0 0 10.0 0.0 101\n")
+    no_source_station.write_text(f"{_PICKS_HEADER}\n1 100 101 0.0 0 0 0 0 10.0 0.0 101\n")
     with pytest.raises(ValueError, match="source station 100"):
         PicksTxt.open(no_source_station)
 
@@ -143,12 +146,43 @@ def test_picks_file_delimiter_is_detected(tmp_path, synthetic_picks, reformat):
     assert PicksTxt.open(picks).stations == expected.stations
 
 
-def test_picks_file_header_may_use_another_delimiter(tmp_path, synthetic_picks):
+def _reorder_columns(text, order):
+    """Rewrites a whitespace-delimited picks file with its columns in another order."""
+    rows = [row.split() for row in text.splitlines()]
+    return "\n".join(" ".join(row[i] for i in order) for row in rows)
+
+
+@pytest.mark.parametrize("join", [pytest.param(" ".join, id="whitespace"),
+                                  pytest.param(";".join, id="semicolon")])
+def test_picks_file_columns_are_read_by_name(tmp_path, synthetic_picks, join):
+    picks = tmp_path / "picks.dat"
+    shuffled = _reorder_columns(synthetic_picks.read_text(), [9, 3, 0, 10, 6, 2, 8, 5, 1, 7, 4])
+    picks.write_text(_reformat_picks(shuffled, join) + "\n")
+    expected = PicksTxt.open(synthetic_picks)
+    assert PicksTxt.open(picks).shots == expected.shots
+    assert PicksTxt.open(picks).stations == expected.stations
+
+
+@pytest.mark.parametrize("header", [
+    pytest.param("", id="blank"),
+    pytest.param("picks of line 7", id="no column names"),
+    pytest.param(None, id="no header line"),
+    pytest.param("FFID SOU_SLOC SRF_SLOC FB_PICK", id="missing columns"),
+    pytest.param(_PICKS_HEADER.lower(), id="lower case"),
+    pytest.param(_PICKS_HEADER.replace("FFID", "SHOT"), id="unknown column"),
+    pytest.param(_PICKS_HEADER.replace("CDP", "FFID"), id="duplicate column"),
+    pytest.param(";".join(_PICKS_HEADER.split()), id="another delimiter"),
+])
+def test_picks_file_with_an_invalid_header_is_rejected(tmp_path, synthetic_picks, header):
     picks = tmp_path / "picks.dat"
     lines = synthetic_picks.read_text().splitlines()
-    lines[0] = "FFID;SOU_SLOC;SRF_SLOC;FB_PICK"
+    if header is None:
+        del lines[0]
+    else:
+        lines[0] = header
     picks.write_text("\n".join(lines) + "\n")
-    assert PicksTxt.open(picks).shot_amount == 25
+    with pytest.raises(ValueError, match="header on line 1 must name the columns"):
+        PicksTxt.open(picks)
 
 
 def test_picks_file_with_another_delimiter_is_rejected(tmp_path, synthetic_picks):

@@ -32,7 +32,7 @@ Everything on disk is directory-based. A `Project` is just a directory. Each `Li
 
 | File | Class | Role |
 |---|---|---|
-| `picks_origin.dat` | `PicksTxt` | Verbatim copy of the user's picks file. Whitespace-delimited ASCII, 11 columns, one header line skipped. The column spec is in the `PicksTxt` docstring. Parsed at open to derive the shots, their metadata and the station list. |
+| `picks_origin.dat` | `PicksTxt` | Verbatim copy of the user's picks file. ASCII, 11 columns delimited by whitespace or semicolons. The first line is a header naming the columns, which may come in any order. The column spec is in the `PicksTxt` docstring. Parsed at open to derive the shots, their metadata and the station list. |
 | `picks.bin` | `PicksBin` | Random-access mirror of the picks. Header = `shotAmount` (int) + `shotPositions` (long[]); each shot = 24-byte header + 32 bytes per pick. The app reads and writes shots here, and erased picks are persisted here. A shot is rewritten in place, so it can only shrink. |
 | `draw_points.bin` | `DrawPointsBin` | Header = `shotAmount` (int), then a fixed block of 14 points (two doubles each) per shot. |
 | `interpretations.csv` | `InterpretationsCSV` | 21 columns per shot (thicknesses, velocities, intercepts, intersection x values). Rewritten in full on every save, by loading all rows, replacing one and writing all. |

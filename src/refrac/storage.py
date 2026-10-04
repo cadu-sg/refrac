@@ -14,6 +14,7 @@ original Java version of refrac, so lines created by either version open in the 
 
 import csv
 import math
+import re
 import shutil
 import struct
 from collections.abc import Sequence
@@ -34,6 +35,9 @@ _INT = struct.Struct(">i")
 _SHOT_HEADER = struct.Struct(">iiifff")
 # recStat, travelTime, recX, recY, recElev, offset, cdp, waveType
 _PICK = struct.Struct(">ifffffif")
+
+_PICKS_COLUMNS = ("FFID", "SOU_SLOC", "SRF_SLOC", "FB_PICK", "SOU_X", "SOU_Y",
+                  "REC_X", "REC_Y", "REC_ELEV", "OFFSET", "CDP")
 
 
 def _float32(text: str) -> float:
@@ -56,18 +60,19 @@ def _detect_delimiter(lines: Sequence[str]) -> str:
 class PicksTxt:
     """First-break picks text file.
 
-    Columns, delimited by whitespace or by semicolons (detected with `csv.Sniffer`), US-ASCII, one
-    header line that is always skipped:
+    Columns, delimited by whitespace or by semicolons (detected with `csv.Sniffer`), US-ASCII:
 
-    1. FFID: shot sequential number
-    2. SOU_SLOC: source station number
-    3. SRF_SLOC: receiver station number
-    4. FB_PICK: travel time (ms)
-    5. SOU_X, 6. SOU_Y: source coordinates
-    7. REC_X, 8. REC_Y: receiver coordinates
-    9. REC_ELEV: receiver station elevation
-    10. OFFSET: signed source-receiver offset (m)
-    11. CDP: station nearest to the source-receiver midpoint
+    - FFID: shot sequential number
+    - SOU_SLOC: source station number
+    - SRF_SLOC: receiver station number
+    - FB_PICK: travel time (ms)
+    - SOU_X, SOU_Y: source coordinates
+    - REC_X, REC_Y: receiver coordinates
+    - REC_ELEV: receiver station elevation
+    - OFFSET: signed source-receiver offset (m)
+    - CDP: station nearest to the source-receiver midpoint
+
+    The first line is a header naming the columns, exactly as above and each once, in any order.
 
     A shot is a run of consecutive rows with the same FFID.
     """
@@ -89,28 +94,30 @@ class PicksTxt:
         rows = []
         try:
             with open(path, newline="", encoding="ascii") as file:
-                # Runs of spaces and tabs count as a single space, so aligned columns and
-                # "; " separators come out uniform
-                lines = [" ".join(line.split()) for line in file.read().splitlines()[1:]]
-            reader = csv.reader(lines, delimiter=_detect_delimiter(lines), quoting=csv.QUOTE_NONE)
-            for record in reader:
-                fields = [field.strip() for field in record]
-                while fields and not fields[-1]:  # a trailing semicolon is not another column
-                    fields.pop()
-                if not fields:
-                    continue
-                line_number = reader.line_num + 1  # the header line was skipped
+                # Runs of whitespace count as a single space, and spaces around semicolons and a
+                # final semicolon are dropped, so aligned columns and "; " separators come out
+                # uniform
+                lines = [re.sub(r" ?; ?", ";", " ".join(line.split())).removesuffix(";")
+                         for line in file.read().splitlines()]
+            # The data rows decide the delimiter, so a header that doesn't follow it is reported
+            # as an invalid header
+            reader = csv.DictReader(lines, delimiter=_detect_delimiter(lines[1:]),
+                                    quoting=csv.QUOTE_NONE)
+            if sorted(reader.fieldnames or []) != sorted(_PICKS_COLUMNS):
+                raise ValueError("Cannot read picks file: the header on line 1 must name the "
+                                 f"columns {' '.join(_PICKS_COLUMNS)}, in any order")
+            for row in reader:
                 try:
-                    if len(fields) != 11:
-                        raise ValueError(f"expected 11 columns, found {len(fields)}")
+                    if None in row or None in row.values():  # extra or missing fields
+                        raise ValueError("expected 11 columns")
                     rows.append((
-                        int(fields[0]), int(fields[1]), int(fields[2]), _float32(fields[3]),
-                        _float32(fields[4]), _float32(fields[5]), _float32(fields[6]),
-                        _float32(fields[7]), _float32(fields[8]), _float32(fields[9]),
-                        int(fields[10])))
+                        int(row["FFID"]), int(row["SOU_SLOC"]), int(row["SRF_SLOC"]),
+                        _float32(row["FB_PICK"]), _float32(row["SOU_X"]), _float32(row["SOU_Y"]),
+                        _float32(row["REC_X"]), _float32(row["REC_Y"]),
+                        _float32(row["REC_ELEV"]), _float32(row["OFFSET"]), int(row["CDP"])))
                 except ValueError as e:
                     raise ValueError(
-                        f"Cannot read picks file: invalid line {line_number}: {e}") from e
+                        f"Cannot read picks file: invalid line {reader.line_num}: {e}") from e
         except FileNotFoundError as e:
             raise ValueError(f"Cannot read picks file: no such file: {path}") from e
         except UnicodeDecodeError as e:
