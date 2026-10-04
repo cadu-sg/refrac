@@ -74,7 +74,8 @@ def _detect_decimal(lines: Sequence[str]) -> str:
 class PicksTxt:
     """First-break picks text file.
 
-    Columns, delimited by whitespace or by semicolons (detected with `csv.Sniffer`), US-ASCII:
+    UTF-8 text, with or without a byte order mark. Columns, delimited by whitespace or by
+    semicolons (detected with `csv.Sniffer`):
 
     - FFID: shot sequential number
     - SOU_SLOC: source station number
@@ -114,7 +115,8 @@ class PicksTxt:
     def open(cls, path: Path) -> PicksTxt:
         rows = []
         try:
-            with open(path, newline="", encoding="ascii") as file:
+            # utf-8-sig drops the byte order mark that some exports, such as Excel's, start with
+            with open(path, newline="", encoding="utf-8-sig") as file:
                 # Runs of whitespace count as a single space, and spaces around semicolons and a
                 # final semicolon are dropped, so aligned columns and "; " separators come out
                 # uniform
@@ -149,7 +151,7 @@ class PicksTxt:
         except FileNotFoundError as e:
             raise ValueError(f"Cannot read picks file: no such file: {path}") from e
         except UnicodeDecodeError as e:
-            raise ValueError(f"Cannot read picks file: not an ASCII file: {path}") from e
+            raise ValueError(f"Cannot read picks file: not a UTF-8 file: {path}") from e
         except csv.Error as e:
             raise ValueError(f"Cannot read picks file: {e}") from e
         if not rows:

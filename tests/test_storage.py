@@ -142,6 +142,29 @@ def test_sou_elev_column_must_have_a_value_on_every_line(tmp_path):
         PicksTxt.open(picks)
 
 
+@pytest.mark.parametrize("reformat", [
+    pytest.param(lambda text: text, id="whitespace"),
+    pytest.param(lambda text: _reformat_picks(text, ";".join).replace(".", ","),
+                 id="semicolon and decimal comma"),
+])
+def test_picks_file_byte_order_mark_is_skipped(tmp_path, synthetic_picks, reformat):
+    picks = tmp_path / "picks.csv"
+    picks.write_bytes(b"\xef\xbb\xbf" + (reformat(synthetic_picks.read_text()) + "\n").encode())
+    expected = PicksTxt.open(synthetic_picks)
+    assert PicksTxt.open(picks).shots == expected.shots
+    assert PicksTxt.open(picks).stations == expected.stations
+
+
+@pytest.mark.parametrize("encoding", ["latin-1", "utf-16"])
+def test_picks_file_that_is_not_utf8_is_rejected(tmp_path, synthetic_picks, encoding):
+    picks = tmp_path / "picks.dat"
+    lines = synthetic_picks.read_text().splitlines()
+    lines[20] += " \u00b0"  # degree sign
+    picks.write_text("\n".join(lines) + "\n", encoding=encoding)
+    with pytest.raises(ValueError, match="not a UTF-8 file"):
+        PicksTxt.open(picks)
+
+
 def test_picks_file_tolerates_blank_lines(tmp_path, synthetic_picks):
     picks = tmp_path / "picks.dat"
     picks.write_text(synthetic_picks.read_text() + "\n\n")
@@ -166,10 +189,11 @@ def _reformat_picks(text, join, pad=None):
     pytest.param(lambda text: _reformat_picks(text, lambda row: ";".join(row) + ";"),
                  id="trailing semicolon"),
     pytest.param(lambda text: _reformat_picks(text, ";".join).replace("\n", "\r\n"), id="crlf"),
+    pytest.param(lambda text: _reformat_picks(text, "\u00a0".join), id="non-breaking spaces"),
 ])
 def test_picks_file_delimiter_is_detected(tmp_path, synthetic_picks, reformat):
     picks = tmp_path / "picks.dat"
-    picks.write_text(reformat(synthetic_picks.read_text()) + "\n", newline="")
+    picks.write_text(reformat(synthetic_picks.read_text()) + "\n", encoding="utf-8", newline="")
     expected = PicksTxt.open(synthetic_picks)
     assert PicksTxt.open(picks).shots == expected.shots
     assert PicksTxt.open(picks).stations == expected.stations
