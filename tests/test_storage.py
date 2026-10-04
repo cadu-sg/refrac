@@ -231,6 +231,53 @@ def test_picks_file_reports_the_line_of_a_semicolon_error(tmp_path, synthetic_pi
         PicksTxt.open(picks)
 
 
+@pytest.mark.parametrize("join", [pytest.param(" ".join, id="whitespace"),
+                                  pytest.param(";".join, id="semicolon")])
+def test_picks_file_decimal_comma_is_detected(tmp_path, synthetic_picks, join):
+    picks = tmp_path / "picks.dat"
+    picks.write_text(_reformat_picks(synthetic_picks.read_text(), join).replace(".", ",") + "\n")
+    expected = PicksTxt.open(synthetic_picks)
+    assert PicksTxt.open(picks).shots == expected.shots
+    assert PicksTxt.open(picks).stations == expected.stations
+
+
+def test_picks_file_with_decimal_comma_and_sou_elev(tmp_path):
+    picks = tmp_path / "picks.csv"
+    picks.write_text(
+        "FFID;SOU_SLOC;SRF_SLOC;FB_PICK;SOU_X;SOU_Y;REC_X;REC_Y;SOU_ELEV;REC_ELEV;OFFSET;CDP\n"
+        "1;1;161;120,0;4000,0;0,0;4000,0;0,0;251,0;251,0;0,0;161\n"
+        "1;1;162;8,5;4000,0;0,0;4025,0;0,0;251,0;249,0;-25,0;162\n")
+    (shot,) = PicksTxt.open(picks).shots
+    assert (shot.sou_x, shot.sou_elev) == (4000.0, 251.0)
+    pick = shot.picks[1]
+    assert (pick.travel_time, pick.rec_x, pick.rec_elev, pick.offset) == (
+        8.5, 4025.0, 249.0, -25.0)
+
+
+def test_picks_file_with_integers_only(tmp_path):
+    picks = tmp_path / "picks.dat"
+    picks.write_text(
+        f"{_PICKS_HEADER}\n1 101 101 0 0 0 0 0 10 0 101\n1 101 102 8 0 0 5 0 11 5 102\n")
+    (shot,) = PicksTxt.open(picks).shots
+    assert [pick.travel_time for pick in shot.picks] == [0.0, 8.0]
+
+
+@pytest.mark.parametrize("edit_line, comma_line", [
+    pytest.param(lambda line: line.replace(".", ","), 21, id="one row with commas"),
+    pytest.param(lambda line: line.replace("500000.00", "500.000,00"), 21,
+                 id="thousands separator"),
+])
+def test_picks_file_with_mixed_decimal_separators_is_rejected(tmp_path, synthetic_picks,
+                                                              edit_line, comma_line):
+    picks = tmp_path / "picks.dat"
+    lines = synthetic_picks.read_text().splitlines()
+    lines[comma_line - 1] = edit_line(lines[comma_line - 1])
+    picks.write_text("\n".join(lines) + "\n")
+    with pytest.raises(ValueError, match=f"decimal separator, '.' on line 2 and ',' on line "
+                                         f"{comma_line}"):
+        PicksTxt.open(picks)
+
+
 def test_project_creates_and_opens_lines(tmp_path, synthetic_picks):
     project = Project.create(tmp_path / "project")
     line = project.create_line("L1", synthetic_picks)
@@ -238,3 +285,4 @@ def test_project_creates_and_opens_lines(tmp_path, synthetic_picks):
     assert sorted(path.name for path in line.home_dir.iterdir()) == [
         "draw_points.bin", "interpretations.csv", "picks.bin", "picks_origin.dat"]
     assert project.open_line(line.home_dir).shot_amount == 25
+

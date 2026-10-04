@@ -5,6 +5,7 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
+from refrac.dialogs import NewLineDialog
 from refrac.main_window import MainWindow
 from refrac.pick_chart import DRAWER_NAMES, ERASER, ZOOM, PickChart
 from refrac.storage import Line, Project
@@ -26,7 +27,7 @@ def window(qtbot, tmp_path, synthetic_picks):
     window = MainWindow()
     qtbot.addWidget(window)
     window.errors = []
-    window._show_error = lambda header, content: window.errors.append(header)
+    window._show_error = lambda header, content: window.errors.append((header, content))
     project = Project.create(tmp_path / "project")
     window.set_project(project)
     window.set_line(project.create_line("line", synthetic_picks))
@@ -186,6 +187,21 @@ def test_interfaces_and_source_hang_from_the_sou_elev_column(window, tmp_path, s
     assert elevation1 == pytest.approx(113.0 - h1)
 
 
+def test_undetectable_decimal_separator_is_reported(window, tmp_path, synthetic_picks,
+                                                    monkeypatch):
+    picks = tmp_path / "mixed.dat"
+    lines = synthetic_picks.read_text().splitlines()
+    lines[20] = lines[20].replace(".", ",")
+    picks.write_text("\n".join(lines) + "\n")
+    monkeypatch.setattr(NewLineDialog, "ask", lambda parent=None: ("mixed", picks))
+    line = window.line
+    window._on_new_line()
+    ((header, content),) = window.errors
+    assert header == "Cannot create line"
+    assert "decimal separator, '.' on line 2 and ',' on line 21" in content
+    assert window.line is line
+
+
 @pytest.fixture
 def chart(qtbot):
     chart = PickChart()
@@ -267,5 +283,5 @@ def test_incoherent_interpretation_is_reported(window):
     chart.drawer("head1L").set_points((-85, 200), (-35, 100))
     chart.drawer("head1R").set_points((35, 100), (90, 200))
     window.save_plot()
-    assert window.errors == ["Cannot compute layer thickness"]
+    assert [header for header, _ in window.errors] == ["Cannot compute layer thickness"]
     assert math.isnan(window.line.load_all_interpretations()[MIDDLE_SHOT][2])

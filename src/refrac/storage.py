@@ -57,6 +57,20 @@ def _detect_delimiter(lines: Sequence[str]) -> str:
                          "expected whitespace or semicolon") from e
 
 
+def _detect_decimal(lines: Sequence[str]) -> str:
+    """Decimal point or comma, whichever the data rows (from line 2 of the file) use.
+
+    Every row is checked, so a file that uses both anywhere is rejected rather than guessed at.
+    """
+    dot_line = next((num for num, line in enumerate(lines, 2) if "." in line), None)
+    comma_line = next((num for num, line in enumerate(lines, 2) if "," in line), None)
+    if dot_line and comma_line:
+        raise ValueError(f"Cannot read picks file: unable to detect the decimal separator, '.' "
+                         f"on line {dot_line} and ',' on line {comma_line}. Use either '.' or ',' "
+                         "throughout the file, without thousands separators")
+    return "," if comma_line else "."
+
+
 class PicksTxt:
     """First-break picks text file.
 
@@ -72,6 +86,9 @@ class PicksTxt:
     - OFFSET: signed source-receiver offset (m)
     - CDP: station nearest to the source-receiver midpoint
     - SOU_ELEV (optional): source elevation
+
+    Numbers use a decimal point or a decimal comma, the same throughout the file and without
+    thousands separators (detected from the data rows).
 
     The first line is a header naming the columns, exactly as above and each once, in any order.
     Without a SOU_ELEV column, the source elevation is the elevation of the receiver station with
@@ -105,8 +122,11 @@ class PicksTxt:
                          for line in file.read().splitlines()]
             # The data rows decide the delimiter, so a header that doesn't follow it is reported
             # as an invalid header
-            reader = csv.DictReader(lines, delimiter=_detect_delimiter(lines[1:]),
-                                    quoting=csv.QUOTE_NONE)
+            delimiter = _detect_delimiter(lines[1:])
+            if _detect_decimal(lines[1:]) == ",":
+                # A comma can't be the delimiter, so every comma in a data row is a decimal comma
+                lines[1:] = [line.replace(",", ".") for line in lines[1:]]
+            reader = csv.DictReader(lines, delimiter=delimiter, quoting=csv.QUOTE_NONE)
             columns = sorted(reader.fieldnames or [])
             has_sou_elev = columns == sorted((*_PICKS_COLUMNS, _SOU_ELEV_COLUMN))
             if columns != sorted(_PICKS_COLUMNS) and not has_sou_elev:
