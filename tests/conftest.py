@@ -19,5 +19,16 @@ def synthetic_picks() -> Path:
 
 
 @pytest.fixture
+def sou_elev_picks(tmp_path, synthetic_picks) -> Path:
+    """The synthetic picks with a leading SOU_ELEV column of 100 + FFID, an elevation no station
+    has."""
+    header, *rows = synthetic_picks.read_text().splitlines()
+    picks = tmp_path / "sou_elev_picks.dat"
+    picks.write_text("\n".join([f"SOU_ELEV {header}"]
+                               + [f"{100 + int(row.split()[0])} {row}" for row in rows]) + "\n")
+    return picks
+
+
+@pytest.fixture
 def line(tmp_path, synthetic_picks) -> Line:
     return Line.create(tmp_path / "line", synthetic_picks)

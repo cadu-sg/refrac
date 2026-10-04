@@ -37,6 +37,7 @@ _PICK = struct.Struct(">ifffffif")
 
 _PICKS_COLUMNS = ("FFID", "SOU_SLOC", "SRF_SLOC", "FB_PICK", "SOU_X", "SOU_Y",
                   "REC_X", "REC_Y", "REC_ELEV", "OFFSET", "CDP")
+_SOU_ELEV_COLUMN = "SOU_ELEV"
 
 
 def _float32(text: str) -> float:
@@ -70,8 +71,11 @@ class PicksTxt:
     - REC_ELEV: receiver station elevation
     - OFFSET: signed source-receiver offset (m)
     - CDP: station nearest to the source-receiver midpoint
+    - SOU_ELEV (optional): source elevation
 
     The first line is a header naming the columns, exactly as above and each once, in any order.
+    Without a SOU_ELEV column, the source elevation is the elevation of the receiver station with
+    the source's station number.
 
     A shot is a run of consecutive rows with the same FFID.
     """
@@ -81,7 +85,8 @@ class PicksTxt:
         self.shots = shots
         self.stations = stations
         self.shots_metadata = [
-            ShotMetadata(shot.seq_num, shot.sou_stat, shot.sou_x, shot.sou_y, len(shot.picks))
+            ShotMetadata(shot.seq_num, shot.sou_stat, shot.sou_x, shot.sou_y, shot.sou_elev,
+                         len(shot.picks))
             for shot in shots]
 
     @property
@@ -102,18 +107,22 @@ class PicksTxt:
             # as an invalid header
             reader = csv.DictReader(lines, delimiter=_detect_delimiter(lines[1:]),
                                     quoting=csv.QUOTE_NONE)
-            if sorted(reader.fieldnames or []) != sorted(_PICKS_COLUMNS):
+            columns = sorted(reader.fieldnames or [])
+            has_sou_elev = columns == sorted((*_PICKS_COLUMNS, _SOU_ELEV_COLUMN))
+            if columns != sorted(_PICKS_COLUMNS) and not has_sou_elev:
                 raise ValueError("Cannot read picks file: the header on line 1 must name the "
-                                 f"columns {' '.join(_PICKS_COLUMNS)}, in any order")
+                                 f"columns {' '.join(_PICKS_COLUMNS)}, in any order, and "
+                                 f"optionally {_SOU_ELEV_COLUMN}")
             for row in reader:
                 try:
                     if None in row or None in row.values():  # extra or missing fields
-                        raise ValueError("expected 11 columns")
+                        raise ValueError(f"expected {len(columns)} columns")
                     rows.append((
                         int(row["FFID"]), int(row["SOU_SLOC"]), int(row["SRF_SLOC"]),
                         _float32(row["FB_PICK"]), _float32(row["SOU_X"]), _float32(row["SOU_Y"]),
                         _float32(row["REC_X"]), _float32(row["REC_Y"]),
-                        _float32(row["REC_ELEV"]), _float32(row["OFFSET"]), int(row["CDP"])))
+                        _float32(row["REC_ELEV"]), _float32(row["OFFSET"]), int(row["CDP"]),
+                        _float32(row[_SOU_ELEV_COLUMN]) if has_sou_elev else None))
                 except ValueError as e:
                     raise ValueError(
                         f"Cannot read picks file: invalid line {reader.line_num}: {e}") from e
@@ -127,19 +136,22 @@ class PicksTxt:
             raise ValueError("Cannot read picks file: no picks found")
 
         stations: dict[int, Station] = {}
-        for _, _, rec_stat, _, _, _, rec_x, rec_y, rec_elev, _, _ in rows:
+        for _, _, rec_stat, _, _, _, rec_x, rec_y, rec_elev, *_ in rows:
             stations.setdefault(rec_stat, Station(rec_stat, rec_x, rec_y, rec_elev))
 
         shots = []
         for _, shot_rows in groupby(rows, key=lambda row: row[0]):
             shot_rows = list(shot_rows)
-            seq_num, sou_stat, _, _, sou_x, sou_y, *_ = shot_rows[0]
-            if sou_stat not in stations:
-                raise ValueError(f"Unable to determine elevation for source station {sou_stat}")
+            seq_num, sou_stat, _, _, sou_x, sou_y, *_, sou_elev = shot_rows[0]
+            if sou_elev is None:
+                if sou_stat not in stations:
+                    raise ValueError(
+                        f"Unable to determine elevation for source station {sou_stat}")
+                sou_elev = stations[sou_stat].elev
             picks = [Pick(rec_stat, travel_time, rec_x, rec_y, rec_elev, offset, cdp)
-                     for _, _, rec_stat, travel_time, _, _, rec_x, rec_y, rec_elev, offset, cdp
+                     for _, _, rec_stat, travel_time, _, _, rec_x, rec_y, rec_elev, offset, cdp, _
                      in shot_rows]
-            shots.append(Shot(seq_num, sou_stat, sou_x, sou_y, stations[sou_stat].elev, picks))
+            shots.append(Shot(seq_num, sou_stat, sou_x, sou_y, sou_elev, picks))
 
         return cls(path, shots, [stations[num] for num in sorted(stations)])
 

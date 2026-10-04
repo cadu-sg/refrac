@@ -77,8 +77,7 @@ class LayerChart(QWidget):
         receivers = [self._stations[num] for num in {pick.rec_stat for pick in shot.picks}
                      if num in self._stations]
         self._receivers.setData(x=[s.x for s in receivers], y=[s.elev for s in receivers])
-        source = self._stations.get(shot.sou_stat)
-        self._source.setData(x=[source.x] if source else [], y=[source.elev] if source else [])
+        self._source.setData(x=[shot.sou_x], y=[shot.sou_elev])
 
     def _on_click(self, ev) -> None:
         if ev.double() or self._shots_sou_x.size == 0:

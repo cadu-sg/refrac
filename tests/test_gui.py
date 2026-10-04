@@ -169,9 +169,21 @@ def test_reopened_line_plots_saved_interfaces(window, tmp_path):
     window.try_change_shot(MIDDLE_SHOT)
     window.pick_chart.set_draw_points(draw_points_on_picks(window.main_shot))
     window.save_plot()
+    saved_interfaces = window.layer_chart.interface_points
     home_dir = window.line.home_dir
     window.set_line(Line.open(home_dir))
-    assert list(window.layer_chart.interface_points) == [221]
+    assert window.layer_chart.interface_points == saved_interfaces
+
+
+def test_interfaces_and_source_hang_from_the_sou_elev_column(window, tmp_path, sou_elev_picks):
+    window.set_line(window.project.create_line("sou_elev", sou_elev_picks))
+    window.try_change_shot(MIDDLE_SHOT)
+    assert list(window.layer_chart._source.getData()[1]) == [113.0]  # 100 + FFID
+    window.pick_chart.set_draw_points(draw_points_on_picks(window.main_shot))
+    window.save_plot()
+    h1 = window.line.load_all_interpretations()[MIDDLE_SHOT][2]
+    _, elevation1, _, _ = window.layer_chart.interface_points[221]
+    assert elevation1 == pytest.approx(113.0 - h1)
 
 
 @pytest.fixture

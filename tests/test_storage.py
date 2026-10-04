@@ -113,6 +113,35 @@ def test_invalid_picks_files(tmp_path):
         PicksTxt.open(no_source_station)
 
 
+def test_sou_elev_column_gives_the_source_elevation(tmp_path, synthetic_picks, sou_elev_picks):
+    line = Line.create(tmp_path / "line", sou_elev_picks)
+    assert line.load_shot(0).sou_elev == 101.0
+    assert [m.sou_elev for m in line.shots_metadata] == [100.0 + n for n in range(1, 26)]
+    expected = PicksTxt.open(synthetic_picks)
+    assert line.stations == expected.stations
+    assert [shot.picks for shot in PicksTxt.open(sou_elev_picks).shots] == [
+        shot.picks for shot in expected.shots]
+
+
+def test_without_sou_elev_the_source_elevation_is_the_station_elevation(line):
+    stations = {station.num: station for station in line.stations}
+    assert all(m.sou_elev == stations[m.sou_stat].elev for m in line.shots_metadata)
+
+
+def test_sou_elev_column_does_not_need_a_source_station(tmp_path):
+    picks = tmp_path / "picks.dat"
+    picks.write_text(f"{_PICKS_HEADER} SOU_ELEV\n1 100 101 0.0 0 0 0 0 10.0 0.0 101 12.5\n")
+    (shot,) = PicksTxt.open(picks).shots
+    assert (shot.sou_stat, shot.sou_elev) == (100, 12.5)
+
+
+def test_sou_elev_column_must_have_a_value_on_every_line(tmp_path):
+    picks = tmp_path / "picks.dat"
+    picks.write_text(f"{_PICKS_HEADER} SOU_ELEV\n1 101 101 0.0 0 0 0 0 10.0 0.0 101\n")
+    with pytest.raises(ValueError, match="invalid line 2: expected 12 columns"):
+        PicksTxt.open(picks)
+
+
 def test_picks_file_tolerates_blank_lines(tmp_path, synthetic_picks):
     picks = tmp_path / "picks.dat"
     picks.write_text(synthetic_picks.read_text() + "\n\n")
@@ -172,6 +201,7 @@ def test_picks_file_columns_are_read_by_name(tmp_path, synthetic_picks, join):
     pytest.param(_PICKS_HEADER.replace("FFID", "SHOT"), id="unknown column"),
     pytest.param(_PICKS_HEADER.replace("CDP", "FFID"), id="duplicate column"),
     pytest.param(";".join(_PICKS_HEADER.split()), id="another delimiter"),
+    pytest.param(f"{_PICKS_HEADER} SOU_ELEV SOU_ELEV", id="duplicate optional column"),
 ])
 def test_picks_file_with_an_invalid_header_is_rejected(tmp_path, synthetic_picks, header):
     picks = tmp_path / "picks.dat"

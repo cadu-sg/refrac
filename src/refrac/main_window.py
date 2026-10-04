@@ -309,13 +309,12 @@ class MainWindow(QMainWindow):
         self._on_drawings_changed()
 
     def _load_layer_thicknesses(self) -> None:
-        stations = {station.num: station for station in self.line.stations}
-        for interpretation in self.line.load_all_interpretations():
+        for metadata, interpretation in zip(self.line.shots_metadata,
+                                            self.line.load_all_interpretations()):
             thicknesses = interpretation[2:5]
-            station = stations.get(int(interpretation[1]))
-            if (station is not None and thicknesses[0] != UNDEFINED
+            if (thicknesses[0] != UNDEFINED
                     and not any(math.isnan(thickness) for thickness in thicknesses)):
-                self.layer_chart.plot_layer_thickness(thicknesses, station)
+                self.layer_chart.plot_layer_thickness(thicknesses, metadata.station())
 
     # Shots
 

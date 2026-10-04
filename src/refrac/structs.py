@@ -41,7 +41,11 @@ class ShotMetadata:
     sou_stat: int
     sou_x: float
     sou_y: float
+    sou_elev: float
     pick_amount: int
+
+    def station(self) -> Station:
+        return Station(self.sou_stat, self.sou_x, self.sou_y, self.sou_elev)
 
 
 @dataclass(slots=True)
