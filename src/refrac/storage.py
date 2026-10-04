@@ -11,6 +11,8 @@ Record N of `picks.bin`, block N of `draw_points.bin` and row N of `interpretati
 describe the shot with index N. The binary files are big-endian.
 """
 
+from __future__ import annotations
+
 import csv
 import math
 import re

@@ -10,10 +10,10 @@ This branch (`python-port`) is a port of the original JavaFX application, which 
 
 ## Commands
 
-Python 3.14 comes from mise (`mise.toml`) and dependencies are managed with uv. With mise activated, entering the directory activates `.venv`.
+Python 3.10 comes from mise (`mise.toml`) and dependencies are managed with uv. With mise activated, entering the directory activates `.venv`. 3.10 is the oldest Python the app supports (students often install it through Anaconda), so it must not use syntax or standard library APIs added in 3.11 or later.
 
 ```bash
-mise install           # Python 3.14 and uv
+mise install           # Python 3.10 and uv
 uv sync                # create .venv with the dependencies
 uv run refrac          # run the app (or: uv run python -m refrac)
 uv run pytest          # all tests; GUI tests run offscreen (QT_QPA_PLATFORM=offscreen in tests/conftest.py)

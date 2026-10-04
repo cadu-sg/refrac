@@ -13,7 +13,7 @@ import numpy as np
 from refrac.drawers import ORIGIN, Intersection, LineDrawer
 from refrac.geometry import least_squares
 
-type PicksSource = Callable[[], tuple[np.ndarray, np.ndarray]]
+PicksSource = Callable[[], tuple[np.ndarray, np.ndarray]]
 
 
 class LineFit:

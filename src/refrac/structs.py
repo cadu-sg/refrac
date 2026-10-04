@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 # point (0, 0) all mean absent
 UNDEFINED = 0.0
 
-type Point = tuple[float, float]
+Point = tuple[float, float]
 
 UNDEFINED_POINT: Point = (UNDEFINED, UNDEFINED)
 
