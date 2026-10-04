@@ -379,6 +379,8 @@ class Line:
 
     @classmethod
     def create(cls, home_dir: Path, picks_file: Path) -> Line:
+        # Parsed before anything is written, so an unreadable picks file leaves no line directory
+        picks_txt = PicksTxt.open(picks_file)
         try:
             home_dir.mkdir(parents=True, exist_ok=True)
         except OSError as e:
@@ -387,7 +389,7 @@ class Line:
         picks_txt_path = home_dir / PICKS_TXT_NAME
         if not (picks_txt_path.exists() and picks_txt_path.samefile(picks_file)):
             shutil.copyfile(picks_file, picks_txt_path)
-        picks_txt = PicksTxt.open(picks_txt_path)
+        picks_txt = PicksTxt(picks_txt_path, picks_txt.shots, picks_txt.stations)
 
         return cls(
             home_dir,

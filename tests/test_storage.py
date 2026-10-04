@@ -286,3 +286,18 @@ def test_project_creates_and_opens_lines(tmp_path, synthetic_picks):
         "draw_points.bin", "interpretations.csv", "picks.bin", "picks_origin.dat"]
     assert project.open_line(line.home_dir).shot_amount == 25
 
+
+@pytest.mark.parametrize("contents", [
+    pytest.param(None, id="missing file"),
+    pytest.param(f"{_PICKS_HEADER}\n1 101 101 0.0 1 2 3\n", id="invalid line"),
+    pytest.param(f"{_PICKS_HEADER}\n1 101 101 0.0 0 0 0 0 10.0 0.0 101\n"
+                 "1 101 102 8,0 0 0 5 0 11.0 5.0 102\n", id="mixed decimal separators"),
+])
+def test_unreadable_picks_file_creates_no_line_directory(tmp_path, contents):
+    project = Project.create(tmp_path / "project")
+    picks = tmp_path / "picks.dat"
+    if contents is not None:
+        picks.write_text(contents)
+    with pytest.raises(ValueError, match="Cannot read picks file"):
+        project.create_line("L1", picks)
+    assert list(project.home_dir.iterdir()) == []

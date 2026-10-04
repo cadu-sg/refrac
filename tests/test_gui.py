@@ -200,6 +200,7 @@ def test_undetectable_decimal_separator_is_reported(window, tmp_path, synthetic_
     assert header == "Cannot create line"
     assert "decimal separator, '.' on line 2 and ',' on line 21" in content
     assert window.line is line
+    assert not (window.project.home_dir / "mixed").exists()
 
 
 @pytest.fixture
