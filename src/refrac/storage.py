@@ -8,8 +8,7 @@
 | `interpretations.csv` | InterpretationsCSV | 21 interpretation values per shot                 |
 
 Record N of `picks.bin`, block N of `draw_points.bin` and row N of `interpretations.csv` all
-describe the shot with index N. The binary files are big-endian and byte-compatible with the
-original Java version of refrac, so lines created by either version open in the other.
+describe the shot with index N. The binary files are big-endian.
 """
 
 import csv
@@ -41,7 +40,7 @@ _PICKS_COLUMNS = ("FFID", "SOU_SLOC", "SRF_SLOC", "FB_PICK", "SOU_X", "SOU_Y",
 
 
 def _float32(text: str) -> float:
-    # The Java version stores these columns as float, keep the same precision
+    # picks.bin stores these columns as float32, so parsed shots match the shots loaded from it
     return float(np.float32(text))
 
 
@@ -304,14 +303,14 @@ class InterpretationsCSV:
 
     def _save_all(self, rows: Sequence[Sequence[float]]) -> None:
         with open(self.path, "w", newline="", encoding="ascii") as file:
-            writer = csv.writer(file)  # CRLF line endings, like the Java version
+            writer = csv.writer(file)  # CRLF line endings
             writer.writerow(self.HEADER)
             for row in rows:
                 writer.writerow([int(row[0]), int(row[1])] + [_format_double(v) for v in row[2:]])
 
 
 def _format_double(value: float) -> str:
-    # Spell non-finite values the way Java's Double.parseDouble reads them
+    # Spell non-finite values as NaN, Infinity and -Infinity
     if math.isnan(value):
         return "NaN"
     if math.isinf(value):

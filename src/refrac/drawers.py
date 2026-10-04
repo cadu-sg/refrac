@@ -69,7 +69,7 @@ class LineDrawer:
         if not self.drawn:
             return UNDEFINED, UNDEFINED
         (x1, y1), (x2, y2) = self.p1, self.p2
-        # A vertical line gives an infinite slope, as in the Java version
+        # A vertical line gives an infinite slope
         with np.errstate(all="ignore"):
             slope = np.float64(y2 - y1) / np.float64(x2 - x1)
             return float(slope), float(y1 - slope * x1)

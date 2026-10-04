@@ -7,7 +7,7 @@ right apparent velocities are combined, and a missing side falls back to the oth
 
 Zero means undefined throughout. The arithmetic runs on numpy float64 scalars with floating
 point errors ignored, so an incoherent interpretation (e.g. a refractor slower than the layer
-above it) yields NaN instead of raising, as in the Java version.
+above it) yields NaN instead of raising.
 """
 
 from collections.abc import Mapping

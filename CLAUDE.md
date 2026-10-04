@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `refrac` is a PySide6 + PyQtGraph desktop application for **seismic refraction interpretation**. The user loads first-break picks from a seismic line and steps through the shots one at a time. Over each shot's travel-time curve they draw straight lines for the direct wave and up to 3 refracted arrivals, on both sides of the shot. The app derives layer velocities and thicknesses from the slopes and intercepts of those lines, and plots the resulting subsurface interfaces.
 
-This branch (`python-port`) is a port of the original JavaFX application, which still lives on `main`. The on-disk line format is byte-compatible with the Java version, so lines created by either version open in the other.
+This branch (`python-port`) is a port of the original JavaFX application, which still lives on `main`.
 
 ## Commands
 
@@ -37,7 +37,7 @@ Everything on disk is directory-based. A `Project` is just a directory. Each `Li
 | `draw_points.bin` | `DrawPointsBin` | Header = `shotAmount` (int), then a fixed block of 14 points (two doubles each) per shot. |
 | `interpretations.csv` | `InterpretationsCSV` | 21 columns per shot (thicknesses, velocities, intercepts, intersection x values). Rewritten in full on every save, by loading all rows, replacing one and writing all. |
 
-The binary files are **big-endian** (Java's `ByteBuffer` default), and the float fields of picks are float32. The CSV uses CRLF line endings and writes non-finite values as Java spells them (`NaN`, `Infinity`). Keep these conventions so `main` can still read the files.
+The binary files are **big-endian**, and the float fields of picks are float32. The CSV uses CRLF line endings and writes non-finite values as `NaN`, `Infinity` and `-Infinity`.
 
 **`shotIndex` is the shared key.** Record *N* in `picks.bin`, block *N* in `draw_points.bin` and row *N* in `interpretations.csv` all describe the same shot. Anything that changes shot ordering or count invalidates all three.
 
