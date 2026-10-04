@@ -73,29 +73,34 @@ class PicksTxt:
 
     @classmethod
     def open(cls, path: Path) -> PicksTxt:
+        rows = []
         try:
-            with open(path, encoding="ascii") as file:
-                lines = file.read().splitlines()[1:]  # skip the header line
+            with open(path, newline="", encoding="ascii") as file:
+                # Columns are separated by runs of spaces or tabs. Quotes mean nothing here
+                reader = csv.reader((line.replace("\t", " ") for line in file), delimiter=" ",
+                                    skipinitialspace=True, quoting=csv.QUOTE_NONE)
+                next(reader, None)  # skip the header line
+                for record in reader:
+                    fields = [field for field in record if field]  # drops trailing separators
+                    if not fields:
+                        continue
+                    try:
+                        if len(fields) != 11:
+                            raise ValueError(f"expected 11 columns, found {len(fields)}")
+                        rows.append((
+                            int(fields[0]), int(fields[1]), int(fields[2]), _float32(fields[3]),
+                            _float32(fields[4]), _float32(fields[5]), _float32(fields[6]),
+                            _float32(fields[7]), _float32(fields[8]), _float32(fields[9]),
+                            int(fields[10])))
+                    except ValueError as e:
+                        raise ValueError(
+                            f"Cannot read picks file: invalid line {reader.line_num}: {e}") from e
         except FileNotFoundError as e:
             raise ValueError(f"Cannot read picks file: no such file: {path}") from e
         except UnicodeDecodeError as e:
             raise ValueError(f"Cannot read picks file: not an ASCII file: {path}") from e
-
-        rows = []
-        for line_number, line in enumerate(lines, start=2):
-            fields = line.split()
-            if not fields:
-                continue
-            try:
-                if len(fields) != 11:
-                    raise ValueError(f"expected 11 columns, found {len(fields)}")
-                rows.append((
-                    int(fields[0]), int(fields[1]), int(fields[2]), _float32(fields[3]),
-                    _float32(fields[4]), _float32(fields[5]), _float32(fields[6]),
-                    _float32(fields[7]), _float32(fields[8]), _float32(fields[9]),
-                    int(fields[10])))
-            except ValueError as e:
-                raise ValueError(f"Cannot read picks file: invalid line {line_number}: {e}") from e
+        except csv.Error as e:
+            raise ValueError(f"Cannot read picks file: {e}") from e
         if not rows:
             raise ValueError("Cannot read picks file: no picks found")
 

@@ -116,6 +116,21 @@ def test_picks_file_tolerates_blank_lines(tmp_path, synthetic_picks):
     assert PicksTxt.open(picks).shot_amount == 25
 
 
+def test_picks_file_tolerates_irregular_whitespace(tmp_path, synthetic_picks):
+    picks = tmp_path / "picks.dat"
+    lines = synthetic_picks.read_text().splitlines()
+    lines[1] = "  " + lines[1].replace(" ", "\t", 3) + "   "  # leading, tabs and trailing
+    lines[2] = lines[2].replace(" ", '  "')  # quotes are ordinary characters, not csv quoting
+    picks.write_text("\n".join(lines) + "\n")
+    with pytest.raises(ValueError, match="invalid line 3"):
+        PicksTxt.open(picks)
+
+    lines[2] = synthetic_picks.read_text().splitlines()[2]
+    picks.write_text("\r\n".join(lines) + "\r\n")
+    expected = PicksTxt.open(synthetic_picks)
+    assert PicksTxt.open(picks).shots == expected.shots
+
+
 def test_project_creates_and_opens_lines(tmp_path, synthetic_picks):
     project = Project.create(tmp_path / "project")
     line = project.create_line("L1", synthetic_picks)
