@@ -17,7 +17,7 @@ import math
 import shutil
 import struct
 from collections.abc import Sequence
-from itertools import groupby
+from itertools import groupby, islice
 from pathlib import Path
 
 import numpy as np
@@ -41,10 +41,23 @@ def _float32(text: str) -> float:
     return float(np.float32(text))
 
 
+def _detect_delimiter(lines: Sequence[str]) -> str:
+    """Whitespace (a single space, as the lines are normalised) or semicolon."""
+    sample = list(islice(filter(None, lines), 10))
+    if not sample:
+        return " "
+    try:
+        return csv.Sniffer().sniff("\n".join(sample), delimiters=" ;").delimiter
+    except csv.Error as e:
+        raise ValueError("Cannot read picks file: unable to detect the delimiter, "
+                         "expected whitespace or semicolon") from e
+
+
 class PicksTxt:
     """First-break picks text file.
 
-    Columns, whitespace-delimited, US-ASCII, one header line that is always skipped:
+    Columns, delimited by whitespace or by semicolons (detected with `csv.Sniffer`), US-ASCII, one
+    header line that is always skipped:
 
     1. FFID: shot sequential number
     2. SOU_SLOC: source station number
@@ -76,25 +89,28 @@ class PicksTxt:
         rows = []
         try:
             with open(path, newline="", encoding="ascii") as file:
-                # Columns are separated by runs of spaces or tabs. Quotes mean nothing here
-                reader = csv.reader((line.replace("\t", " ") for line in file), delimiter=" ",
-                                    skipinitialspace=True, quoting=csv.QUOTE_NONE)
-                next(reader, None)  # skip the header line
-                for record in reader:
-                    fields = [field for field in record if field]  # drops trailing separators
-                    if not fields:
-                        continue
-                    try:
-                        if len(fields) != 11:
-                            raise ValueError(f"expected 11 columns, found {len(fields)}")
-                        rows.append((
-                            int(fields[0]), int(fields[1]), int(fields[2]), _float32(fields[3]),
-                            _float32(fields[4]), _float32(fields[5]), _float32(fields[6]),
-                            _float32(fields[7]), _float32(fields[8]), _float32(fields[9]),
-                            int(fields[10])))
-                    except ValueError as e:
-                        raise ValueError(
-                            f"Cannot read picks file: invalid line {reader.line_num}: {e}") from e
+                # Runs of spaces and tabs count as a single space, so aligned columns and
+                # "; " separators come out uniform
+                lines = [" ".join(line.split()) for line in file.read().splitlines()[1:]]
+            reader = csv.reader(lines, delimiter=_detect_delimiter(lines), quoting=csv.QUOTE_NONE)
+            for record in reader:
+                fields = [field.strip() for field in record]
+                while fields and not fields[-1]:  # a trailing semicolon is not another column
+                    fields.pop()
+                if not fields:
+                    continue
+                line_number = reader.line_num + 1  # the header line was skipped
+                try:
+                    if len(fields) != 11:
+                        raise ValueError(f"expected 11 columns, found {len(fields)}")
+                    rows.append((
+                        int(fields[0]), int(fields[1]), int(fields[2]), _float32(fields[3]),
+                        _float32(fields[4]), _float32(fields[5]), _float32(fields[6]),
+                        _float32(fields[7]), _float32(fields[8]), _float32(fields[9]),
+                        int(fields[10])))
+                except ValueError as e:
+                    raise ValueError(
+                        f"Cannot read picks file: invalid line {line_number}: {e}") from e
         except FileNotFoundError as e:
             raise ValueError(f"Cannot read picks file: no such file: {path}") from e
         except UnicodeDecodeError as e:

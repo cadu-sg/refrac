@@ -116,19 +116,55 @@ def test_picks_file_tolerates_blank_lines(tmp_path, synthetic_picks):
     assert PicksTxt.open(picks).shot_amount == 25
 
 
-def test_picks_file_tolerates_irregular_whitespace(tmp_path, synthetic_picks):
-    picks = tmp_path / "picks.dat"
-    lines = synthetic_picks.read_text().splitlines()
-    lines[1] = "  " + lines[1].replace(" ", "\t", 3) + "   "  # leading, tabs and trailing
-    lines[2] = lines[2].replace(" ", '  "')  # quotes are ordinary characters, not csv quoting
-    picks.write_text("\n".join(lines) + "\n")
-    with pytest.raises(ValueError, match="invalid line 3"):
-        PicksTxt.open(picks)
+def _reformat_picks(text, join, pad=None):
+    """Rewrites every row of a whitespace-delimited picks file with another delimiter."""
+    rows = [row.split() for row in text.splitlines()]
+    return "\n".join(join(row if pad is None else [f"{f:>{pad}}" for f in row]) for row in rows)
 
-    lines[2] = synthetic_picks.read_text().splitlines()[2]
-    picks.write_text("\r\n".join(lines) + "\r\n")
+
+@pytest.mark.parametrize("reformat", [
+    pytest.param(lambda text: text, id="whitespace"),
+    pytest.param(lambda text: _reformat_picks(text, "\t".join), id="tabs"),
+    pytest.param(lambda text: _reformat_picks(text, " ".join, pad=12), id="aligned columns"),
+    pytest.param(lambda text: _reformat_picks(text, "  ".join).replace("\n", "   \n"),
+                 id="trailing spaces"),
+    pytest.param(lambda text: _reformat_picks(text, ";".join), id="semicolon"),
+    pytest.param(lambda text: _reformat_picks(text, "; ".join), id="semicolon and space"),
+    pytest.param(lambda text: _reformat_picks(text, ";".join, pad=12), id="aligned semicolon"),
+    pytest.param(lambda text: _reformat_picks(text, lambda row: ";".join(row) + ";"),
+                 id="trailing semicolon"),
+    pytest.param(lambda text: _reformat_picks(text, ";".join).replace("\n", "\r\n"), id="crlf"),
+])
+def test_picks_file_delimiter_is_detected(tmp_path, synthetic_picks, reformat):
+    picks = tmp_path / "picks.dat"
+    picks.write_text(reformat(synthetic_picks.read_text()) + "\n", newline="")
     expected = PicksTxt.open(synthetic_picks)
     assert PicksTxt.open(picks).shots == expected.shots
+    assert PicksTxt.open(picks).stations == expected.stations
+
+
+def test_picks_file_header_may_use_another_delimiter(tmp_path, synthetic_picks):
+    picks = tmp_path / "picks.dat"
+    lines = synthetic_picks.read_text().splitlines()
+    lines[0] = "FFID;SOU_SLOC;SRF_SLOC;FB_PICK"
+    picks.write_text("\n".join(lines) + "\n")
+    assert PicksTxt.open(picks).shot_amount == 25
+
+
+def test_picks_file_with_another_delimiter_is_rejected(tmp_path, synthetic_picks):
+    picks = tmp_path / "picks.dat"
+    picks.write_text(_reformat_picks(synthetic_picks.read_text(), ",".join) + "\n")
+    with pytest.raises(ValueError, match="detect the delimiter"):
+        PicksTxt.open(picks)
+
+
+def test_picks_file_reports_the_line_of_a_semicolon_error(tmp_path, synthetic_picks):
+    picks = tmp_path / "picks.dat"
+    lines = _reformat_picks(synthetic_picks.read_text(), ";".join).splitlines()
+    lines[20] = lines[20].replace(";", "", 1)  # merges two columns, past the rows used to sniff
+    picks.write_text("\n".join(lines) + "\n")
+    with pytest.raises(ValueError, match="invalid line 21"):
+        PicksTxt.open(picks)
 
 
 def test_project_creates_and_opens_lines(tmp_path, synthetic_picks):
