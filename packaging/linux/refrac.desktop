@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=refrac
+Comment=Seismic refraction interpretation from first-break picks
+Exec=refrac
+Icon=refrac
+Terminal=false
+Categories=Science;Geoscience;

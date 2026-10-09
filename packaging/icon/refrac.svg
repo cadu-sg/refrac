@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- A travel-time curve: first-break picks along a direct wave and a
+       refracted arrival, with the two straight lines drawn over them. -->
+  <rect x="8" y="8" width="240" height="240" rx="44" fill="#1d4e89"/>
+  <g stroke="#9fc3ec" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.55">
+    <line x1="44" y1="212" x2="212" y2="212"/>
+    <line x1="44" y1="212" x2="44" y2="44"/>
+  </g>
+  <g stroke="#ffffff" stroke-width="10" stroke-linecap="round" fill="none">
+    <line x1="44" y1="212" x2="104" y2="122"/>
+    <line x1="88" y1="136" x2="214" y2="70"/>
+  </g>
+  <g fill="#ffb238">
+    <circle cx="62" cy="185" r="11"/>
+    <circle cx="82" cy="155" r="11"/>
+    <circle cx="112" cy="123" r="11"/>
+    <circle cx="146" cy="106" r="11"/>
+    <circle cx="180" cy="88" r="11"/>
+    <circle cx="210" cy="72" r="11"/>
+  </g>
+</svg>

@@ -5,6 +5,8 @@ __pycache__/
 .pytest_cache/
 dist/
 
+# PyInstaller and AppImage builds (packaging/)
+build/
+
 # Build output of the Java version, kept on the main branch
 target/
-

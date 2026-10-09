@@ -1,0 +1,159 @@
+# Builds the self-contained apps: refrac-windows-setup.exe and
+# refrac-linux-x86_64.AppImage.
+#
+# Run by hand with a tag (gh workflow run release.yml -f tag=v1.0) to build
+# that tag and attach both files to its GitHub release. The packaging files
+# always come from the commit the workflow runs on, so an older tag can be
+# built with newer packaging.
+#
+# A push that changes the packaging builds and tests the current commit,
+# without releasing anything.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build and attach to its release (e.g. v1.0)
+        required: true
+  push:
+    paths:
+      - packaging/**
+      - .github/workflows/release.yml
+
+permissions:
+  contents: write
+
+env:
+  APP_REF: ${{ inputs.tag || github.sha }}
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    # The oldest supported distribution: the AppImage needs a glibc at least
+    # as new as the build machine's
+    container: ubuntu:22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.APP_REF }}
+          path: app
+      - name: Build the AppImage
+        run: bash packaging/linux/build-appimage.sh app dist "${APP_REF#v}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: refrac-linux
+          path: dist/refrac-linux-x86_64.AppImage
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.APP_REF }}
+          path: app
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install refrac's locked dependencies and PyInstaller
+        run: |
+          python -m venv venv
+          source venv/Scripts/activate
+          python -m pip install -q --upgrade pip uv
+          uv export --project app --frozen --no-dev --no-emit-project -q -o requirements.txt
+          pip install -q --require-hashes -r requirements.txt
+          pip install -q --no-deps ./app
+          pip install -q -r packaging/build-requirements.txt
+      - name: Build the bundle
+        run: venv/Scripts/pyinstaller --noconfirm packaging/refrac.spec
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
+          $version = "$env:APP_REF" -replace '^v', ''
+          & $iscc /Qp "/DAppVersion=$version" packaging\windows\refrac.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: refrac-windows
+          path: dist/refrac-windows-setup.exe
+          if-no-files-found: error
+
+  test-linux:
+    needs: build-linux
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: ["ubuntu:22.04", "ubuntu:24.04"]
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: refrac-linux
+          path: dist
+      - name: Start the AppImage without libxcb-cursor0 installed
+        run: |
+          chmod +x dist/refrac-linux-x86_64.AppImage
+          bash packaging/linux/test-appimage.sh dist/refrac-linux-x86_64.AppImage
+
+  test-windows:
+    needs: build-windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: refrac-windows
+          path: dist
+      - name: Install silently, then start refrac
+        shell: pwsh
+        run: |
+          $setup = Start-Process -Wait -PassThru -FilePath dist\refrac-windows-setup.exe `
+            -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$PWD\install.log"
+          $exe = "$env:LOCALAPPDATA\Programs\refrac\refrac.exe"
+          $shortcut = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\refrac.lnk"
+          if ($setup.ExitCode -ne 0 -or -not (Test-Path $exe) -or -not (Test-Path $shortcut)) {
+            Get-Content install.log
+            exit 1
+          }
+          # A crash on startup shows PyInstaller's error dialog, which keeps
+          # the process alive, so wait for the main window's title instead
+          $app = Start-Process -PassThru -FilePath $exe
+          for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep -Seconds 1
+            $app.Refresh()
+            if ($app.HasExited) { Write-Error "refrac exited with code $($app.ExitCode)"; exit 1 }
+            if ($app.MainWindowTitle -eq 'refrac') {
+              Write-Output 'The refrac window appeared'
+              Stop-Process -Id $app.Id
+              exit 0
+            }
+          }
+          Write-Error "No refrac window; window title: '$($app.MainWindowTitle)'"
+          exit 1
+
+  release:
+    if: inputs.tag != ''
+    needs: [test-linux, test-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Attach the files to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$APP_REF" --clobber --repo "$GITHUB_REPOSITORY" \
+            dist/refrac-windows-setup.exe dist/refrac-linux-x86_64.AppImage

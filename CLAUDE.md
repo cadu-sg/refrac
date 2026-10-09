@@ -97,3 +97,25 @@ Chart axes are offset in metres (x) and travel time in **milliseconds** (y), so 
 Shot changes all go through `try_change_shot()`. It compares the current draw points against `last_saved_draw_points` and asks Save / Don't save / Cancel before discarding. `_update_plot()` seeds the drawers with the nearest interpretation saved at or before the main shot (`_first_previous_draw_points`). If there is none, the drawers keep whatever they had.
 
 `LayerChart` doubles as a navigation control: clicking it emits `shotClicked` with the shot whose `sou_x` is nearest.
+
+## Packaging and releases
+
+Users install self-contained apps from GitHub Releases, built by `.github/workflows/release.yml` with PyInstaller. Everything is in `packaging/`:
+
+- `refrac.spec`: the PyInstaller spec for both systems (one-folder bundle). On Linux it prunes the bundle: it drops Qt plugins a desktop app doesn't need, drops the libraries on the AppImage excludelist (which must come from the user's system, `libstdc++` among them), then drops every library nothing kept needs. It explicitly bundles `libxcb-cursor.so.0`, which many desktops lack.
+- `linux/build-appimage.sh`: builds `refrac-linux-x86_64.AppImage` in an Ubuntu 22.04 container (the oldest supported glibc). `linux/test-appimage.sh` checks in a clean container, without `libxcb-cursor0`, that the main window appears. Both scripts' headers show how to run them locally with Docker.
+- `windows/refrac.iss`: the Inno Setup script for `refrac-windows-setup.exe`, a per-user install needing no administrator rights. Its `AppId` must never change.
+- `icon/`: `refrac.svg` is the source; `make_icons.py` regenerates the PNG and ICO.
+
+The release asset names have no version, so the README links to `releases/latest/download/<asset>`.
+
+The workflow builds the app source of a tag with the packaging files of the commit the workflow runs on, so tags without packaging (like `v1.0`) can be built. The dependencies come from the tag's `uv.lock`. To release:
+
+```bash
+git tag -a v1.1 -m "refrac 1.1" && git push origin v1.1
+gh release create v1.1 --draft --title "refrac 1.1" --notes "..."
+gh workflow run release.yml -f tag=v1.1     # builds, tests, attaches both files
+gh release edit v1.1 --draft=false --latest
+```
+
+A push that changes `packaging/` or the workflow builds and tests without releasing.
