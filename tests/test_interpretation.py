@@ -2,7 +2,8 @@ import math
 
 import pytest
 
-from refrac.interpretation import average_velocity, compute_interpretation, velocity
+from refrac.interpretation import (average_velocity, combined_velocity, compute_interpretation,
+                                   velocity)
 
 # Flat layers over a half-space
 V = [600.0, 1800.0, 3000.0, 4500.0]  # m/s
@@ -79,3 +80,6 @@ def test_velocity_helpers():
     assert velocity(0.0) == 0.0
     assert average_velocity(1.0, -0.5) == pytest.approx(2000 / 1.5)
     assert average_velocity(1.0, 0.0) == 0.0
+    assert combined_velocity(1.0, -0.5) == pytest.approx(2000 / 1.5)
+    assert combined_velocity(-2.0, 0.0) == combined_velocity(0.0, 2.0) == 500.0
+    assert combined_velocity(0.0, 0.0) == 0.0

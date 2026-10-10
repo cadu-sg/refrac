@@ -29,6 +29,16 @@ def average_velocity(slope1: float, slope2: float) -> float:
     return 2000 / (abs(slope1) + abs(slope2))
 
 
+def combined_velocity(slope1: float, slope2: float) -> float:
+    """Velocity (m/s) from the average slowness of both sides, or from the one side defined, or
+    UNDEFINED if neither is."""
+    if slope1 == UNDEFINED:
+        return velocity(slope2)
+    if slope2 == UNDEFINED:
+        return velocity(slope1)
+    return average_velocity(slope1, slope2)
+
+
 def compute_interpretation(
         slopes: Mapping[str, float], intercepts: Mapping[str, float],
 ) -> tuple[list[float], list[float]]:

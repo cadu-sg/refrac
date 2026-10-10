@@ -49,7 +49,7 @@ The dominant naming convention is the ordered tuple `DRAWER_NAMES` in `pick_char
 head3L, head2L, head1L, directL, directR, head1R, head2R, head3R
 ```
 
-`head` is a head wave (refracted arrival), and `L`/`R` is the side of the shot point. `INTERSECTION_PAIRS`, `FIT_ORDER`, the fit wiring in `PickChart.__init__`, the `WAVES` rows in `main_window.py` and the draw-points packing all follow this ordering, and must stay consistent with it.
+`head` is a head wave (refracted arrival), and `L`/`R` is the side of the shot point. `INTERSECTION_PAIRS`, `FIT_ORDER`, the fit wiring in `PickChart.__init__`, `WAVES` (the left/right drawer pairs, also in `pick_chart.py`), `unpack_draw_points` and the draw-points packing all follow this ordering, and must stay consistent with it.
 
 `PickChart.get_draw_points()` returns 14 points, not 16. The `directL`/`directR` drawers are `OriginFixedLineDrawer`s pinned to (0, 0), so only their second point is stored. That 14 is `DrawPointsBin.POINTS_AMOUNT` and determines the on-disk block size. Changing the drawer set means changing both, and existing `draw_points.bin` files then become unreadable (`DrawPointsBin.open` validates the file size). Incomplete lines (only p1 placed) are stored as undefined.
 
@@ -97,6 +97,10 @@ Chart axes are offset in metres (x) and travel time in **milliseconds** (y), so 
 Shot changes all go through `try_change_shot()`. It compares the current draw points against `last_saved_draw_points` and asks Save / Don't save / Cancel before discarding. `_update_plot()` seeds the drawers with the nearest interpretation saved at or before the main shot (`_first_previous_draw_points`). If there is none, the drawers keep whatever they had.
 
 `LayerChart` doubles as a navigation control: clicking it emits `shotClicked` with the shot whose `sou_x` is nearest.
+
+### Export (`export.py`)
+
+**Line → Export Interpretation...** writes one CSV row per shot worked on, meaning a shot whose saved draw points have any defined point. The columns are `FFID, SOU_SLOC, SOU_X, SOU_Y, SOU_ELEV, V0..V3, Z1..Z3`. Everything is recomputed from the saved draw points, not read from `interpretations.csv`, whose refractor velocities are the dipping-layer true velocities. V*n* is `combined_velocity` of the left and right slopes: the average slowness of both sides, or the lone side. Z*n* is `SOU_ELEV` minus the thicknesses down to layer *n*. Values that can't be computed (UNDEFINED, NaN) are empty cells. The format is standard CSV with a comma delimiter and floats at 2 decimals. The current shot's unsaved drawings go through the same Save / Don't save / Cancel prompt as a shot change (`_resolve_unsaved_changes`).
 
 ## Packaging and releases
 

@@ -2,8 +2,16 @@ import numpy as np
 import pytest
 
 from refrac.drawers import ORIGIN
-from refrac.geometry import least_squares, line_intersection
+from refrac.geometry import least_squares, line_coefficients, line_intersection
 from refrac.line_fit import LineFitEdgy, LineFitOriginFixed, LineFitTwoIntersections
+
+
+def test_line_coefficients():
+    assert line_coefficients((-10, 30), (10, 10)) == pytest.approx((-1, 20))
+    # A vertical line, without a division warning
+    with np.errstate(all="raise"):
+        slope, _ = line_coefficients((5, 0), (5, 10))
+    assert slope == np.inf
 
 
 def test_line_intersection():

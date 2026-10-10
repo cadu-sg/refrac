@@ -6,11 +6,10 @@ state and pyqtgraph items; PickChart decides which drawer receives the mouse eve
 
 from collections.abc import Callable
 
-import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import Qt
 
-from refrac.geometry import line_intersection
+from refrac.geometry import line_coefficients, line_intersection
 from refrac.structs import UNDEFINED, Point
 
 ORIGIN: Point = (0.0, 0.0)
@@ -68,11 +67,7 @@ class LineDrawer:
     def _coefficients(self) -> tuple[float, float]:
         if not self.drawn:
             return UNDEFINED, UNDEFINED
-        (x1, y1), (x2, y2) = self.p1, self.p2
-        # A vertical line gives an infinite slope
-        with np.errstate(all="ignore"):
-            slope = np.float64(y2 - y1) / np.float64(x2 - x1)
-            return float(slope), float(y1 - slope * x1)
+        return line_coefficients(self.p1, self.p2)
 
     def set_points(self, p1: Point, p2: Point) -> None:
         """Places both points at once, completing the line."""

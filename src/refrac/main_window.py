@@ -11,19 +11,13 @@ from PySide6.QtWidgets import (QColorDialog, QDoubleSpinBox, QFileDialog, QFormL
                                QRadioButton, QScrollArea, QSpinBox, QSplitter, QVBoxLayout, QWidget)
 
 from refrac.dialogs import NewLineDialog, NewProjectDialog
+from refrac.export import export_rows, write_export_csv
 from refrac.interpretation import average_velocity, compute_interpretation, velocity
 from refrac.layer_chart import LayerChart
-from refrac.pick_chart import (DRAWER_NAMES, ERASER, HEAD_NAMES, ZOOM, PickChart, PickStyle,
-                               wave_style)
+from refrac.pick_chart import (DRAWER_NAMES, ERASER, HEAD_NAMES, WAVES, ZOOM, PickChart,
+                               PickStyle, wave_style)
 from refrac.storage import Line, Project
 from refrac.structs import UNDEFINED, Point, Shot, is_point_defined
-
-# Interpretation rows: wave title, then its left and right drawers
-WAVES = (("Direct", "directL", "directR"),
-         ("Refracted 1", "head1L", "head1R"),
-         ("Refracted 2", "head2L", "head2R"),
-         ("Refracted 3", "head3L", "head3R"))
-
 
 class MainWindow(QMainWindow):
 
@@ -101,6 +95,8 @@ class MainWindow(QMainWindow):
         self._line_menu = menu_bar.addMenu("&Line")
         self._add_action(self._line_menu, "&New Line...", self._on_new_line)
         self._add_action(self._line_menu, "&Open Line...", self._on_open_line)
+        self._export_action = self._add_action(
+            self._line_menu, "&Export Interpretation...", self._on_export_interpretation)
         self._line_menu.addSeparator()
         self._add_action(self._line_menu, "&Close", lambda: self.set_line(None))
 
@@ -241,6 +237,7 @@ class MainWindow(QMainWindow):
     def _update_state(self) -> None:
         line_loaded = self.line is not None
         self._line_menu.setEnabled(self.project is not None)
+        self._export_action.setEnabled(line_loaded)
         for widget in (self._toolbar, self._layout_box, self._interpretation_box,
                        self._velocities_box):
             widget.setEnabled(line_loaded)
@@ -320,16 +317,20 @@ class MainWindow(QMainWindow):
 
     def try_change_shot(self, shot_index: int) -> None:
         """Loads another shot, first asking to save the drawings if they changed."""
-        if self.line is None:
+        if self.line is None or not self._resolve_unsaved_changes():
             return
-        if not self._draw_points_unchanged():
-            answer = self._ask_save_changes()
-            if answer == QMessageBox.StandardButton.Cancel:
-                return
-            if answer == QMessageBox.StandardButton.Save:
-                self.save_plot()
         self.main_shot_index = shot_index
         self._update_plot()
+
+    def _resolve_unsaved_changes(self) -> bool:
+        """Asks to save the drawings if they changed, and saves them if so answered. False if the
+        user cancels."""
+        if self._draw_points_unchanged():
+            return True
+        answer = self._ask_save_changes()
+        if answer == QMessageBox.StandardButton.Save:
+            self.save_plot()
+        return answer != QMessageBox.StandardButton.Cancel
 
     def _draw_points_unchanged(self) -> bool:
         draw_points = self.pick_chart.get_draw_points()
@@ -463,6 +464,33 @@ class MainWindow(QMainWindow):
             self._show_error("Cannot open line", str(e))
             return
         self.set_line(line)
+
+    def _on_export_interpretation(self) -> None:
+        if self.line is None or not self._resolve_unsaved_changes():
+            return
+        try:
+            rows = export_rows(self.line)
+        except (OSError, ValueError) as e:
+            self._show_error("Cannot export interpretation", str(e))
+            return
+        if not rows:
+            QMessageBox.information(self, "Export Interpretation",
+                                    "No interpreted shots to export. Save the lines of a shot first")
+            return
+        default_path = self.line.home_dir.parent / f"{self.line.title}_interpretation.csv"
+        path, _ = QFileDialog.getSaveFileName(self, "Export Interpretation", str(default_path),
+                                              "CSV files (*.csv)")
+        if not path:
+            return
+        path = Path(path)
+        if not path.suffix:
+            path = path.with_suffix(".csv")
+        try:
+            write_export_csv(path, rows)
+        except OSError as e:
+            self._show_error("Cannot export interpretation", str(e))
+            return
+        self.statusBar().showMessage(f"Exported {len(rows)} shots to {path}", 5000)
 
     def _on_previous_shot(self) -> None:
         if self.main_shot_index > 0:

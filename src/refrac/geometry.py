@@ -8,6 +8,14 @@ from refrac.structs import Point
 PARALLEL_TOLERANCE = 10.0
 
 
+def line_coefficients(p1: Point, p2: Point) -> tuple[float, float]:
+    """Slope and intercept of the line through p1 and p2; a vertical line gives an infinite slope."""
+    (x1, y1), (x2, y2) = p1, p2
+    with np.errstate(all="ignore"):
+        slope = np.float64(y2 - y1) / np.float64(x2 - x1)
+        return float(slope), float(y1 - slope * x1)
+
+
 def line_intersection(p1: Point, p2: Point, q1: Point, q2: Point) -> Point | None:
     """Intersection of the infinite lines through p1-p2 and q1-q2, or None if they are parallel."""
     # Line p as a1 x + b1 y = c1, line q as a2 x + b2 y = c2

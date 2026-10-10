@@ -1,11 +1,13 @@
+import csv
 import math
 
 import numpy as np
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from refrac.dialogs import NewLineDialog
+from refrac.export import EXPORT_COLUMNS
 from refrac.main_window import MainWindow
 from refrac.pick_chart import DRAWER_NAMES, ERASER, ZOOM, PickChart
 from refrac.storage import Line, Project
@@ -101,6 +103,46 @@ def test_unsaved_changes_prompt(window, answer, expected_shot, saved):
     window.try_change_shot(MIDDLE_SHOT + 1)
     assert window.main_shot_index == expected_shot
     assert (window.line.load_draw_points(MIDDLE_SHOT) != [UNDEFINED_POINT] * 14) == saved
+
+
+def test_export_interpretation(window, tmp_path, monkeypatch):
+    assert window._export_action.isEnabled()
+    window.try_change_shot(MIDDLE_SHOT)
+    window.pick_chart.set_draw_points(draw_points_on_picks(window.main_shot))
+    window.pick_chart.fit_all()
+    window.save_plot()
+
+    path = tmp_path / "export"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args: (str(path), ""))
+    window._export_action.trigger()
+    assert window.errors == []
+    with open(path.with_suffix(".csv"), newline="", encoding="utf-8") as file:
+        header, *rows = list(csv.reader(file))
+    assert tuple(header) == EXPORT_COLUMNS
+    ((ffid, sou_sloc, *values),) = rows
+    assert (ffid, sou_sloc) == ("13", "221")
+    assert all(values)
+    _, elevation1, elevation2, elevation3 = window.layer_chart.interface_points[221]
+    assert [float(z) for z in values[-3:]] == pytest.approx(
+        [elevation1, elevation2, elevation3], abs=0.005)
+
+    window.set_line(None)
+    assert not window._export_action.isEnabled()
+
+
+def test_export_after_cancelling_unsaved_changes_does_nothing(window, monkeypatch):
+    window.pick_chart.set_draw_points(draw_points_on_picks(window.main_shot))
+    window._ask_save_changes = lambda: QMessageBox.StandardButton.Cancel
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", pytest.fail)
+    window._export_action.trigger()
+
+
+def test_export_without_interpreted_shots_writes_nothing(window, monkeypatch):
+    messages = []
+    monkeypatch.setattr(QMessageBox, "information", lambda *args: messages.append(args[2]))
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", pytest.fail)
+    window._export_action.trigger()
+    assert len(messages) == 1 and messages[0].startswith("No interpreted shots")
 
 
 def test_erased_picks_are_saved(window):

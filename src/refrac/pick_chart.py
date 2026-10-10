@@ -20,6 +20,12 @@ DRAWER_NAMES = ("head3L", "head2L", "head1L", "directL", "directR", "head1R", "h
 DIRECT_NAMES = ("directL", "directR")
 HEAD_NAMES = tuple(name for name in DRAWER_NAMES if name not in DIRECT_NAMES)
 
+# Each wave's title, then its left and right drawers
+WAVES = (("Direct", "directL", "directR"),
+         ("Refracted 1", "head1L", "head1R"),
+         ("Refracted 2", "head2L", "head2R"),
+         ("Refracted 3", "head3L", "head3R"))
+
 # Color and symbol of each wave, a drawer name being its wave plus its side (L or R)
 WAVE_STYLES = {
     "direct": ("#F3622D", "s"),
@@ -47,6 +53,22 @@ ERASER_COLOR = (224, 29, 29)
 
 def wave_style(drawer_name: str) -> tuple[str, str]:
     return WAVE_STYLES[drawer_name[:-1]]
+
+
+def unpack_draw_points(points: list[Point]) -> dict[str, tuple[Point, Point] | None]:
+    """The end points of each line from the 14 points of PickChart.get_draw_points, or None for
+    the lines not drawn. The direct waves start at the origin."""
+    remaining = iter(points)
+    lines = {}
+    for name in DRAWER_NAMES:
+        if name in DIRECT_NAMES:
+            p1, p2 = ORIGIN, next(remaining)
+            defined = is_point_defined(p2)
+        else:
+            p1, p2 = next(remaining), next(remaining)
+            defined = is_point_defined(p1)
+        lines[name] = (p1, p2) if defined else None
+    return lines
 
 
 @dataclass(frozen=True)
@@ -274,16 +296,9 @@ class PickChart(QWidget):
     def set_draw_points(self, points: list[Point]) -> None:
         """Replaces the lines with those defined by the 14 points from get_draw_points."""
         self.clear_line_drawers()
-        remaining = iter(points)
-        for name, drawer in self._drawers.items():
-            if name in DIRECT_NAMES:
-                p2 = next(remaining)
-                if is_point_defined(p2):
-                    drawer.set_points(ORIGIN, p2)
-            else:
-                p1, p2 = next(remaining), next(remaining)
-                if is_point_defined(p1):
-                    drawer.set_points(p1, p2)
+        for name, line in unpack_draw_points(points).items():
+            if line is not None:
+                self._drawers[name].set_points(*line)
 
     def clear_line_drawers(self) -> None:
         if self.active_tool in self._drawers:
