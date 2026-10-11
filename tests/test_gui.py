@@ -9,11 +9,11 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from refrac.dialogs import NewLineDialog
 from refrac.export import EXPORT_COLUMNS
-from refrac.layer_chart import LayerChart
+from refrac.layer_chart import LAYER_COLORMAPS, LayerChart
 from refrac.main_window import MainWindow
 from refrac.pick_chart import DRAWER_NAMES, ERASER, ZOOM, PickChart
 from refrac.storage import Line, Project
-from refrac.structs import UNDEFINED_POINT, Station
+from refrac.structs import UNDEFINED, UNDEFINED_POINT, Station
 
 LEFT = Qt.MouseButton.LeftButton
 RIGHT = Qt.MouseButton.RightButton
@@ -260,6 +260,69 @@ def test_layer_chart_shows_the_velocity_of_the_layer_under_the_mouse(window):
 def interface_lines(layer_chart: LayerChart) -> list[tuple[list[float], list[float]]]:
     lines = [interface.getData() for interface in layer_chart._interfaces]
     return [([] if xs is None else list(xs), [] if ys is None else list(ys)) for xs, ys in lines]
+
+
+def point_lightnesses(layer_chart: LayerChart, layer: int) -> list[float]:
+    brushes = layer_chart._interfaces[layer - 1].scatter.data["brush"]
+    return [brush.color().lightnessF() for brush in brushes]
+
+
+def test_layer_colors_follow_the_velocities_of_each_layer(qtbot):
+    stations = [Station(num, 100.0 * num, 0.0, 100.0) for num in range(4)]
+    layer_chart = LayerChart(stations, [])
+    qtbot.addWidget(layer_chart)
+    middle = LAYER_COLORMAPS[0].map(0.5, mode="qcolor").lightnessF()
+
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [600.0, 2000.0, 0.0], stations[0])
+    assert point_lightnesses(layer_chart, 1) == pytest.approx([middle])
+
+    # Faster is darker
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [500.0, 2000.0, 0.0], stations[1])
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [700.0, 2000.0, 0.0], stations[2])
+    lightness600, lightness500, lightness700 = point_lightnesses(layer_chart, 1)
+    assert lightness500 > lightness600 > lightness700
+    assert lightness600 == pytest.approx(middle)
+
+    # A velocity difference much smaller than the velocities keeps close to the middle
+    for station in stations[1:3]:
+        layer_chart.plot_layer_thickness([UNDEFINED] * 3, [UNDEFINED] * 3, station)
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [601.0, 2000.0, 0.0], stations[3])
+    assert point_lightnesses(layer_chart, 1) == pytest.approx([middle] * 2, abs=0.02)
+
+
+def fill_outline(fill) -> list[tuple[float, float]]:
+    polygon = fill.polygon()
+    return [(polygon.at(i).x(), polygon.at(i).y()) for i in range(polygon.size())]
+
+
+def fill_colors(fill) -> list[int]:
+    return [color.rgb() for _, color in fill.brush().gradient().stops()]
+
+
+def point_colors(layer_chart: LayerChart, layer: int) -> list[int]:
+    brushes = layer_chart._interfaces[layer - 1].scatter.data["brush"]
+    return [brush.color().rgb() for brush in brushes]
+
+
+def test_layers_are_filled_with_a_gradient_between_the_stations(qtbot):
+    stations = [Station(1, 0.0, 0.0, 100.0), Station(2, 50.0, 0.0, 110.0),
+                Station(3, 100.0, 0.0, 100.0), Station(4, 200.0, 0.0, 100.0)]
+    layer_chart = LayerChart(stations, [])
+    qtbot.addWidget(layer_chart)
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [500.0, 2000.0, 0.0], stations[0])
+    assert layer_chart._fills == []
+
+    # Layer 1 only, as interface 2 is at a single station. Its top follows the surface.
+    layer_chart.plot_layer_thickness([10.0, 20.0, 0.0], [600.0, 2000.0, 3000.0], stations[2])
+    (layer1,) = layer_chart._fills
+    assert fill_outline(layer1) == [(0, 100), (50, 110), (100, 100), (100, 90), (0, 90)]
+    assert fill_colors(layer1) == point_colors(layer_chart, 1)
+
+    layer_chart.plot_layer_thickness([10.0, 30.0, 0.0], [600.0, 2500.0, 3000.0], stations[3])
+    assert len(layer_chart._fills) == 3  # two in layer 1, then one in layer 2
+    layer2 = layer_chart._fills[2]
+    assert fill_outline(layer2) == [(100, 90), (200, 90), (200, 60), (100, 70)]
+    assert fill_colors(layer2) == point_colors(layer_chart, 2)
 
 
 def test_layer_chart_velocity_falls_back_to_the_interfaces_above(qtbot):

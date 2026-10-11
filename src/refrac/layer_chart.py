@@ -2,15 +2,24 @@
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QPointF, Signal
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtCore import QPointF, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPen, QPolygonF
+from PySide6.QtWidgets import QGraphicsPolygonItem, QVBoxLayout, QWidget
 
 from refrac.structs import UNDEFINED, Point, Shot, ShotMetadata, Station
 
 SURFACE_COLOR = "#F3622D"
-INTERFACE_COLORS = ("#FBA71B", "#57B757", "#41A9C9")
 SOURCE_COLOR = "#FF9800"
+# Colors of layers 1 to 3, from the slowest to the fastest velocity of each layer
+LAYER_COLORMAPS = tuple(pg.ColorMap(None, [pg.mkColor(color) for color in colors]) for colors in (
+    ("#FDD0A2", "#FD8D3C", "#A63603"),
+    ("#C7E9C0", "#74C476", "#006D2C"),
+    ("#C6DBEF", "#6BAED6", "#08519C"),
+))
+# A layer's colormap spans at least this fraction of its mean velocity, so that small velocity
+# differences don't stretch over the whole colormap
+MIN_RELATIVE_SPAN = 0.1
+FILL_ALPHA = 170
 HOVER_FONT_SIZE = 8  # pt
 
 
@@ -19,6 +28,11 @@ class LayerChart(QWidget):
     of the main shot, and the interfaces interpreted below each shot.
 
     Clicking the chart emits shotClicked with the index of the shot nearest to the click.
+
+    Below a shot, layer n spans from its interface n point up to the point above it, and is
+    colored from its velocity: each layer has its own hue, from light for the slowest velocity of
+    the layer along the line to dark for the fastest. Each interface point takes the color of the
+    layer above it, and the layers 1 to 3 are filled with a gradient between the shots.
 
     Hovering the chart shows the velocity of a layer below one shot: the shot nearest to the
     mouse along x, and the layer the mouse is in (the deepest interface stands for the layers
@@ -45,20 +59,30 @@ class LayerChart(QWidget):
 
         self._stations = {station.num: station for station in stations}
         surface = sorted(stations, key=lambda station: station.x)
-        plot_item.plot([s.x for s in surface], [s.elev for s in surface],
+        self._surface_x = np.array([s.x for s in surface], dtype=float)
+        self._surface_elev = np.array([s.elev for s in surface], dtype=float)
+        plot_item.plot(self._surface_x, self._surface_elev,
                        pen=pg.mkPen(SURFACE_COLOR, width=2), name="Surface")
-        self._interfaces = [
-            plot_item.plot([], [], pen=pg.mkPen(color, width=2), symbol="o", symbolSize=6,
-                           symbolPen=pg.mkPen(color, width=1.5), symbolBrush="w",
-                           name=f"Interface {number}")
-            for number, color in enumerate(INTERFACE_COLORS, start=1)]
+        self._interfaces = []
+        for number, colormap in enumerate(LAYER_COLORMAPS, start=1):
+            dark, middle = colormap.map(1.0, mode="qcolor"), colormap.map(0.5, mode="qcolor")
+            interface = plot_item.plot([], [], pen=pg.mkPen(dark, width=2), symbol="o",
+                                       symbolSize=7, symbolPen=pg.mkPen(dark, width=1),
+                                       symbolBrush=middle, name=f"Interface {number}")
+            # The legend draws the scatter's default brush, which the points' brushes leave alone
+            interface.scatter.setBrush(middle)
+            self._interfaces.append(interface)
+        self._fills: list[QGraphicsPolygonItem] = []
         self._receivers = pg.ScatterPlotItem(symbol="o", size=4, pen=None, brush="k")
         self._source = pg.ScatterPlotItem(symbol="d", size=15, pen=None, brush=SOURCE_COLOR)
         plot_item.addItem(self._receivers)
         plot_item.addItem(self._source)
 
-        self._hover_segment = pg.PlotDataItem([], [])
-        self._hover_text = pg.TextItem()
+        foreground = pg.getConfigOption("foreground")
+        label_fill = pg.mkColor(pg.getConfigOption("background"))
+        label_fill.setAlpha(200)
+        self._hover_segment = pg.PlotDataItem([], [], pen=pg.mkPen(foreground, width=1))
+        self._hover_text = pg.TextItem(color=foreground, fill=label_fill)
         font = QFont()
         font.setPointSize(HOVER_FONT_SIZE)
         self._hover_text.setFont(font)
@@ -93,7 +117,9 @@ class LayerChart(QWidget):
             self.interface_points[station.num] = (station.x, elevation1, elevation2, elevation3)
             self._layers[station.num] = (station.elev, (h1, h2, h3), tuple(velocities))
         for number, interface in enumerate(self._interfaces, start=1):
-            interface.setData(*self._interface_line(number))
+            colors = self._layer_colors(number)
+            interface.setData(*self._interface_line(number), symbolBrush=list(colors.values()))
+        self._refresh_fills()
         if self._hover_pos is not None:
             self.show_velocity_at(*self._hover_pos)
 
@@ -133,22 +159,16 @@ class LayerChart(QWidget):
             self._hide_velocity()
             return
         station, interface = target
-        station_x, *elevations = self.interface_points[station]
-        surface_elevation, _, velocities = self._layers[station]
-        bottom = elevations[interface - 1]
-        top = surface_elevation if interface == 1 else elevations[interface - 2]
-        color = INTERFACE_COLORS[interface - 1]
+        station_x = self.interface_points[station][0]
+        bottom = self.interface_points[station][interface]
+        top = self._layer_top(station, interface)
+        velocity = self._layers[station][2][interface - 1]
 
         self._hover_segment.setData([station_x, station_x], [top, bottom])
-        self._hover_segment.setPen(pg.mkPen(color, width=1))
         (x_min, x_max), _ = self._plot_widget.getPlotItem().getViewBox().viewRange()
-        text = f"{velocities[interface - 1]:.0f} m/s"
-        if station_x > (x_min + x_max) / 2:
-            self._hover_text.setText(f"{text} ", color=color)
-            self._hover_text.setAnchor((1, 0.5))
-        else:
-            self._hover_text.setText(f" {text}", color=color)
-            self._hover_text.setAnchor((0, 0.5))
+        self._hover_text.setText(f"{velocity:.0f} m/s")
+        # Beside the segment, a little apart, on the side with more room
+        self._hover_text.setAnchor((1.1, 0.5) if station_x > (x_min + x_max) / 2 else (-0.1, 0.5))
         self._hover_text.setPos(station_x, (top + bottom) / 2)
         self._hover_segment.show()
         self._hover_text.show()
@@ -164,6 +184,54 @@ class LayerChart(QWidget):
         points = [self.interface_points[num] for num in self._interface_stations(interface)]
         return (np.array([point[0] for point in points], dtype=float),
                 np.array([point[interface] for point in points], dtype=float))
+
+    def _layer_top(self, station: int, layer: int) -> float:
+        """Elevation of the top of the layer (1 to 3) below the station."""
+        return self._layers[station][0] if layer == 1 else self.interface_points[station][layer - 1]
+
+    def _layer_colors(self, layer: int) -> dict[int, QColor]:
+        """Color of the layer (1 to 3) below each station with that layer, sorted by x."""
+        stations = self._interface_stations(layer)
+        if not stations:
+            return {}
+        velocities = np.array([self._layers[num][2][layer - 1] for num in stations], dtype=float)
+        v_min, v_max = velocities.min(), velocities.max()
+        span = max(v_max - v_min, MIN_RELATIVE_SPAN * velocities.mean())
+        positions = (np.clip((velocities - (v_min + v_max) / 2) / span + 0.5, 0, 1) if span > 0
+                     else np.full(len(stations), 0.5))
+        return dict(zip(stations, LAYER_COLORMAPS[layer - 1].map(positions, mode="qcolor")))
+
+    def _refresh_fills(self) -> None:
+        """Fills the layers 1 to 3 between each pair of neighbouring stations with that layer,
+        with a gradient from the color of the layer below one station to the other's."""
+        plot_item = self._plot_widget.getPlotItem()
+        for fill in self._fills:
+            plot_item.removeItem(fill)
+        self._fills = []
+        for layer in (1, 2, 3):
+            colors = self._layer_colors(layer)
+            stations = list(colors)
+            top_xs, top_elevations = ((self._surface_x, self._surface_elev) if layer == 1
+                                      else self._interface_line(layer - 1))
+            for a, b in zip(stations, stations[1:]):
+                x_a, x_b = self.interface_points[a][0], self.interface_points[b][0]
+                between = (top_xs > x_a) & (top_xs < x_b)
+                outline = [(x_a, self._layer_top(a, layer)),
+                           *zip(top_xs[between], top_elevations[between]),
+                           (x_b, self._layer_top(b, layer)),
+                           (x_b, self.interface_points[b][layer]),
+                           (x_a, self.interface_points[a][layer])]
+                gradient = QLinearGradient(x_a, 0, x_b, 0)
+                for position, station in ((0, a), (1, b)):
+                    color = QColor(colors[station])
+                    color.setAlpha(FILL_ALPHA)
+                    gradient.setColorAt(position, color)
+                fill = QGraphicsPolygonItem(QPolygonF([QPointF(x, y) for x, y in outline]))
+                fill.setBrush(QBrush(gradient))
+                fill.setPen(QPen(Qt.PenStyle.NoPen))
+                plot_item.addItem(fill, ignoreBounds=True)
+                fill.setZValue(-1)
+                self._fills.append(fill)
 
     def _hide_velocity(self) -> None:
         self._hover_segment.hide()
