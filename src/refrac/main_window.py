@@ -73,7 +73,9 @@ class MainWindow(QMainWindow):
                     checkable: bool = False) -> QAction:
         action = QAction(text, self)
         action.setCheckable(checkable)
-        if shortcut is not None:
+        if isinstance(shortcut, list):
+            action.setShortcuts(shortcut)
+        elif shortcut is not None:
             action.setShortcut(shortcut)
         if slot is not None:
             action.triggered.connect(slot)
@@ -104,10 +106,11 @@ class MainWindow(QMainWindow):
         toolbar = self._toolbar = self.addToolBar("Shot")
         toolbar.setMovable(False)
 
-        self._add_action(toolbar, "Save", self.save_plot, QKeySequence.StandardKey.Save)
+        self._add_action(toolbar, "Save", self.save_plot,
+                         [QKeySequence.StandardKey.Save, QKeySequence(Qt.Key.Key_S)])
         toolbar.addSeparator()
-        self._add_action(toolbar, "<", self._on_previous_shot)
-        self._add_action(toolbar, ">", self._on_next_shot)
+        self._add_action(toolbar, "<", self._on_previous_shot, QKeySequence(Qt.Key.Key_Left))
+        self._add_action(toolbar, ">", self._on_next_shot, QKeySequence(Qt.Key.Key_Right))
         toolbar.addSeparator()
 
         self._seq_num_label = QLabel()
@@ -278,6 +281,8 @@ class MainWindow(QMainWindow):
         self._charts.addWidget(self.pick_chart)
         self._charts.addWidget(self.layer_chart)
         self._charts.setSizes([1, 1])
+        # The spin boxes would keep the arrow keys while they have focus
+        self.pick_chart.setFocus()
 
         try:
             self._load_layer_thicknesses()

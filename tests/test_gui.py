@@ -4,7 +4,8 @@ import math
 import numpy as np
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from refrac.dialogs import NewLineDialog
 from refrac.export import EXPORT_COLUMNS
@@ -328,3 +329,19 @@ def test_incoherent_interpretation_is_reported(window):
     window.save_plot()
     assert [header for header, _ in window.errors] == ["Cannot compute layer thickness"]
     assert math.isnan(window.line.load_all_interpretations()[MIDDLE_SHOT][2])
+
+
+def test_shot_keyboard_shortcuts(window, qtbot):
+    window.show()
+    window.activateWindow()
+    qtbot.waitUntil(window.isActiveWindow, timeout=2000)
+    window.try_change_shot(MIDDLE_SHOT)
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Right)
+    assert window.main_shot_index == MIDDLE_SHOT + 1
+    QTest.keyClick(window, Qt.Key.Key_Left)
+    QTest.keyClick(window, Qt.Key.Key_Left)
+    assert window.main_shot_index == MIDDLE_SHOT - 1
+
+    window.pick_chart.set_draw_points(draw_points_on_picks(window.main_shot))
+    QTest.keyClick(window, Qt.Key.Key_S)
+    assert window.line.load_draw_points(MIDDLE_SHOT - 1) != [UNDEFINED_POINT] * 14
