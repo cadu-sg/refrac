@@ -71,8 +71,6 @@ class LayerChart(QWidget):
         self.interface_points: dict[int, tuple[float, float, float, float]] = {}
         # (station elevation, (h1, h2, h3), (v1, v2, v3)) by station
         self._layers: dict[int, tuple[float, tuple[float, ...], tuple[float, ...]]] = {}
-        # interface_points as rows sorted by x
-        self._rows = np.empty((0, 4))
 
         self._shots_sou_x = np.array([shot.sou_x for shot in shots_metadata], dtype=float)
         self._plot_widget.scene().sigMouseClicked.connect(self._on_click)
@@ -81,8 +79,9 @@ class LayerChart(QWidget):
     def plot_layer_thickness(self, thicknesses: list[float], velocities: list[float],
                              station: Station) -> None:
         """Plots the interfaces below the station from the thicknesses of the three layers, or
-        removes them if the first thickness is UNDEFINED. The velocities of the three layers are
-        shown on hover."""
+        removes them if the first thickness is UNDEFINED. An interface whose layer thickness is
+        UNDEFINED is left out, so its line joins the stations around. The velocities of the three
+        layers are shown on hover."""
         h1, h2, h3 = thicknesses
         if h1 == UNDEFINED:
             self.interface_points.pop(station.num, None)
@@ -93,9 +92,8 @@ class LayerChart(QWidget):
             elevation3 = elevation2 - h3
             self.interface_points[station.num] = (station.x, elevation1, elevation2, elevation3)
             self._layers[station.num] = (station.elev, (h1, h2, h3), tuple(velocities))
-        self._rows = np.array(sorted(self.interface_points.values()), dtype=float).reshape(-1, 4)
-        for column, interface in enumerate(self._interfaces, start=1):
-            interface.setData(self._rows[:, 0], self._rows[:, column])
+        for number, interface in enumerate(self._interfaces, start=1):
+            interface.setData(*self._interface_line(number))
         if self._hover_pos is not None:
             self.show_velocity_at(*self._hover_pos)
 
@@ -116,12 +114,13 @@ class LayerChart(QWidget):
         """
         if not self._layers:
             return None
-        xs = self._rows[:, 0]
-        above = sum(np.interp(x, xs, self._rows[:, column]) > y for column in (1, 2, 3))
+        above = 0
+        for interface in (1, 2, 3):
+            xs, elevations = self._interface_line(interface)
+            if xs.size and np.interp(x, xs, elevations) > y:
+                above += 1
         for interface in range(min(above + 1, 3), 0, -1):
-            candidates = [num for num, (_, thicknesses, velocities) in self._layers.items()
-                          if thicknesses[interface - 1] != UNDEFINED
-                          and velocities[interface - 1] != UNDEFINED]
+            candidates = self._interface_stations(interface)
             if candidates:
                 station = min(candidates, key=lambda num: abs(self.interface_points[num][0] - x))
                 return station, interface
@@ -153,6 +152,18 @@ class LayerChart(QWidget):
         self._hover_text.setPos(station_x, (top + bottom) / 2)
         self._hover_segment.show()
         self._hover_text.show()
+
+    def _interface_stations(self, interface: int) -> list[int]:
+        """The stations with a layer above the interface (1 to 3), sorted by x."""
+        stations = [num for num, (_, thicknesses, _) in self._layers.items()
+                    if thicknesses[interface - 1] != UNDEFINED]
+        return sorted(stations, key=lambda num: self.interface_points[num][0])
+
+    def _interface_line(self, interface: int) -> tuple[np.ndarray, np.ndarray]:
+        """x and elevation of the points of the interface (1 to 3), sorted by x."""
+        points = [self.interface_points[num] for num in self._interface_stations(interface)]
+        return (np.array([point[0] for point in points], dtype=float),
+                np.array([point[interface] for point in points], dtype=float))
 
     def _hide_velocity(self) -> None:
         self._hover_segment.hide()

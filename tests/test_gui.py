@@ -257,6 +257,11 @@ def test_layer_chart_shows_the_velocity_of_the_layer_under_the_mouse(window):
     assert not layer_chart._hover_segment.isVisible() and not layer_chart._hover_text.isVisible()
 
 
+def interface_lines(layer_chart: LayerChart) -> list[tuple[list[float], list[float]]]:
+    lines = [interface.getData() for interface in layer_chart._interfaces]
+    return [([] if xs is None else list(xs), [] if ys is None else list(ys)) for xs, ys in lines]
+
+
 def test_layer_chart_velocity_falls_back_to_the_interfaces_above(qtbot):
     stations = [Station(1, 0.0, 0.0, 100.0), Station(2, 100.0, 0.0, 100.0)]
     layer_chart = LayerChart(stations, [])
@@ -269,6 +274,8 @@ def test_layer_chart_velocity_falls_back_to_the_interfaces_above(qtbot):
 
     # Below interface 2, layer 2 is shown even under a station without it
     layer_chart.plot_layer_thickness([10.0, 20.0, 0.0], [500.0, 2000.0, 3000.0], stations[1])
+    assert interface_lines(layer_chart) == [([0.0, 100.0], [90.0, 90.0]), ([100.0], [70.0]),
+                                            ([], [])]
     assert layer_chart.velocity_target(0.0, 50.0) == (2, 2)
     assert layer_chart.velocity_target(0.0, 95.0) == (1, 1)
 
