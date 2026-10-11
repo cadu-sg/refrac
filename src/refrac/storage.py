@@ -300,8 +300,8 @@ class DrawPointsBin:
 class InterpretationsCSV:
     """Interpretations CSV file, one row of COLUMNS values per shot, rewritten in full on every save."""
 
-    HEADER = ("sequentialNumber", "sourceStation", "z1", "z2", "z3",
-              "v0", "v1", "v2", "v3", "t3L", "t2L", "t1L", "t1R", "t2R", "t3R",
+    HEADER = ("sequentialNumber", "sourceStation", "h1", "h2", "h3",
+              "v1", "v2", "v3", "v4", "t4L", "t3L", "t2L", "t2R", "t3R", "t4R",
               "x3L", "x2L", "x1L", "x1R", "x2R", "x3R")
     COLUMNS = len(HEADER)
 

@@ -86,7 +86,7 @@ def test_interpretations_round_trip(line):
     assert loaded[3] == [3, 131] + [0.0] * 19
     # CSV conventions: CRLF, and NaN and Infinity spellings of non-finite values
     text = (line.home_dir / "interpretations.csv").read_bytes()
-    assert text.startswith(b"sequentialNumber,sourceStation,z1,")
+    assert text.startswith(b"sequentialNumber,sourceStation,h1,")
     assert b"\r\n" in text and b",NaN," in text and b",Infinity," in text
 
 

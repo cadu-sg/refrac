@@ -2,7 +2,7 @@
 """
 Generates a synthetic first break picks file in the format read by PicksTxt.
 
-Model: 3 layers over a half-space (V0..V3), gentle topography and laterally
+Model: 3 layers over a half-space (V1..V4), gentle topography and laterally
 varying interfaces. First breaks are the minimum of the direct wave and the
 three head waves, computed with the delay-time approximation (delay under the
 source + delay under the receiver + |offset| / Vrefractor), plus Gaussian noise.
@@ -40,16 +40,16 @@ def surface_elev(x):
 
 
 def thicknesses(x):
-    """Vertical thicknesses (m) of layers 0, 1 and 2 below the point at x."""
+    """Vertical thicknesses (m) of layers 1, 2 and 3 below the point at x."""
     d = x - X0
-    h0 = 8.0 + 2.5 * math.sin(2 * math.pi * d / 400.0)   # weathering layer
-    h1 = 18.0 + 0.01 * d                                  # thickens to the East
-    h2 = 40.0 - 0.008 * d + 5.0 * math.cos(2 * math.pi * d / 1100.0)
-    return h0, h1, h2
+    h1 = 8.0 + 2.5 * math.sin(2 * math.pi * d / 400.0)   # weathering layer
+    h2 = 18.0 + 0.01 * d                                  # thickens to the East
+    h3 = 40.0 - 0.008 * d + 5.0 * math.cos(2 * math.pi * d / 1100.0)
+    return h1, h2, h3
 
 
 def delay_time(x, refractor):
-    """One-way delay time (s) at x for the head wave travelling in layer `refractor` (1..3)."""
+    """One-way delay time (s) at x for the head wave of refractor 1..3, travelling in layer refractor + 1."""
     h = thicknesses(x)
     vr = V[refractor]
     return sum(h[i] * math.sqrt(1.0 - (V[i] / vr) ** 2) / V[i] for i in range(refractor))
