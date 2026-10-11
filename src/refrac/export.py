@@ -1,7 +1,7 @@
 """Export of the interpretation of a line to a CSV file, one row per shot worked on.
 
 A shot has been worked on if any of its lines was saved. Its velocities and interface elevations
-are computed from its saved lines: V0 is the velocity of the direct wave and V1 to V3 those of
+are computed from its saved lines: V1 is the velocity of the direct wave and V2 to V4 those of
 the refracted arrivals, each from the average slowness of both sides or from the one side drawn.
 Z1 to Z3 are the elevations of the interfaces, the layer thicknesses below the source elevation.
 Values that cannot be computed are left empty.
@@ -19,7 +19,7 @@ from refrac.storage import Line
 from refrac.structs import UNDEFINED, Point, ShotMetadata
 
 EXPORT_COLUMNS = ("FFID", "SOU_SLOC", "SOU_X", "SOU_Y", "SOU_ELEV",
-                  "V0", "V1", "V2", "V3", "Z1", "Z2", "Z3")
+                  "V1", "V2", "V3", "V4", "Z1", "Z2", "Z3")
 
 # A row of EXPORT_COLUMNS values, None where a value cannot be computed
 ExportRow = list[float | None]
