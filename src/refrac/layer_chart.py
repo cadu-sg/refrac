@@ -2,14 +2,16 @@
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QPointF, Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
-from refrac.structs import UNDEFINED, Shot, ShotMetadata, Station
+from refrac.structs import UNDEFINED, Point, Shot, ShotMetadata, Station
 
 SURFACE_COLOR = "#F3622D"
 INTERFACE_COLORS = ("#FBA71B", "#57B757", "#41A9C9")
 SOURCE_COLOR = "#FF9800"
+HOVER_FONT_SIZE = 8  # pt
 
 
 class LayerChart(QWidget):
@@ -17,6 +19,10 @@ class LayerChart(QWidget):
     of the main shot, and the interfaces interpreted below each shot.
 
     Clicking the chart emits shotClicked with the index of the shot nearest to the click.
+
+    Hovering the chart shows the velocity of a layer below one shot: the shot nearest to the
+    mouse along x, and the layer the mouse is in (the deepest interface stands for the layers
+    below it). A thin segment spans the layer, from its interface point up to the point above.
     """
 
     shotClicked = Signal(int)
@@ -51,26 +57,47 @@ class LayerChart(QWidget):
         plot_item.addItem(self._receivers)
         plot_item.addItem(self._source)
 
+        self._hover_segment = pg.PlotDataItem([], [])
+        self._hover_text = pg.TextItem()
+        font = QFont()
+        font.setPointSize(HOVER_FONT_SIZE)
+        self._hover_text.setFont(font)
+        for item in (self._hover_segment, self._hover_text):
+            item.hide()
+            plot_item.addItem(item, ignoreBounds=True)
+        self._hover_pos: Point | None = None
+
         # (x, interface 1 elevation, interface 2 elevation, interface 3 elevation) by station
         self.interface_points: dict[int, tuple[float, float, float, float]] = {}
+        # (station elevation, (h1, h2, h3), (v1, v2, v3)) by station
+        self._layers: dict[int, tuple[float, tuple[float, ...], tuple[float, ...]]] = {}
+        # interface_points as rows sorted by x
+        self._rows = np.empty((0, 4))
 
         self._shots_sou_x = np.array([shot.sou_x for shot in shots_metadata], dtype=float)
         self._plot_widget.scene().sigMouseClicked.connect(self._on_click)
+        self._plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
 
-    def plot_layer_thickness(self, thicknesses: list[float], station: Station) -> None:
+    def plot_layer_thickness(self, thicknesses: list[float], velocities: list[float],
+                             station: Station) -> None:
         """Plots the interfaces below the station from the thicknesses of the three layers, or
-        removes them if the first thickness is UNDEFINED."""
+        removes them if the first thickness is UNDEFINED. The velocities of the three layers are
+        shown on hover."""
         h1, h2, h3 = thicknesses
         if h1 == UNDEFINED:
             self.interface_points.pop(station.num, None)
+            self._layers.pop(station.num, None)
         else:
             elevation1 = station.elev - h1
             elevation2 = elevation1 - h2
             elevation3 = elevation2 - h3
             self.interface_points[station.num] = (station.x, elevation1, elevation2, elevation3)
-        rows = np.array(sorted(self.interface_points.values()), dtype=float).reshape(-1, 4)
+            self._layers[station.num] = (station.elev, (h1, h2, h3), tuple(velocities))
+        self._rows = np.array(sorted(self.interface_points.values()), dtype=float).reshape(-1, 4)
         for column, interface in enumerate(self._interfaces, start=1):
-            interface.setData(rows[:, 0], rows[:, column])
+            interface.setData(self._rows[:, 0], self._rows[:, column])
+        if self._hover_pos is not None:
+            self.show_velocity_at(*self._hover_pos)
 
     def plot_shot_in_surface(self, shot: Shot) -> None:
         """Marks the receivers and the source of the shot on the surface."""
@@ -78,6 +105,73 @@ class LayerChart(QWidget):
                      if num in self._stations]
         self._receivers.setData(x=[s.x for s in receivers], y=[s.elev for s in receivers])
         self._source.setData(x=[shot.sou_x], y=[shot.sou_elev])
+
+    def velocity_target(self, x: float, y: float) -> tuple[int, int] | None:
+        """The station and the interface (1 to 3) whose velocity is shown for the mouse at (x, y),
+        or None if no interface is plotted.
+
+        The interface is the first one below y, or the deepest one if y is below them all. The
+        station is the one nearest to x among those with a layer above that interface, falling
+        back to the interface above if there are none.
+        """
+        if not self._layers:
+            return None
+        xs = self._rows[:, 0]
+        above = sum(np.interp(x, xs, self._rows[:, column]) > y for column in (1, 2, 3))
+        for interface in range(min(above + 1, 3), 0, -1):
+            candidates = [num for num, (_, thicknesses, velocities) in self._layers.items()
+                          if thicknesses[interface - 1] != UNDEFINED
+                          and velocities[interface - 1] != UNDEFINED]
+            if candidates:
+                station = min(candidates, key=lambda num: abs(self.interface_points[num][0] - x))
+                return station, interface
+        return None
+
+    def show_velocity_at(self, x: float, y: float) -> None:
+        """Shows the velocity for the mouse at (x, y), as described in velocity_target."""
+        target = self.velocity_target(x, y)
+        if target is None:
+            self._hide_velocity()
+            return
+        station, interface = target
+        station_x, *elevations = self.interface_points[station]
+        surface_elevation, _, velocities = self._layers[station]
+        bottom = elevations[interface - 1]
+        top = surface_elevation if interface == 1 else elevations[interface - 2]
+        color = INTERFACE_COLORS[interface - 1]
+
+        self._hover_segment.setData([station_x, station_x], [top, bottom])
+        self._hover_segment.setPen(pg.mkPen(color, width=1))
+        (x_min, x_max), _ = self._plot_widget.getPlotItem().getViewBox().viewRange()
+        text = f"{velocities[interface - 1]:.0f} m/s"
+        if station_x > (x_min + x_max) / 2:
+            self._hover_text.setText(f"{text} ", color=color)
+            self._hover_text.setAnchor((1, 0.5))
+        else:
+            self._hover_text.setText(f" {text}", color=color)
+            self._hover_text.setAnchor((0, 0.5))
+        self._hover_text.setPos(station_x, (top + bottom) / 2)
+        self._hover_segment.show()
+        self._hover_text.show()
+
+    def _hide_velocity(self) -> None:
+        self._hover_segment.hide()
+        self._hover_text.hide()
+
+    def leaveEvent(self, event) -> None:
+        self._hover_pos = None
+        self._hide_velocity()
+        super().leaveEvent(event)
+
+    def _on_mouse_moved(self, scene_pos: QPointF) -> None:
+        view_box = self._plot_widget.getPlotItem().getViewBox()
+        if not view_box.sceneBoundingRect().contains(scene_pos):
+            self._hover_pos = None
+            self._hide_velocity()
+            return
+        pos = view_box.mapSceneToView(scene_pos)
+        self._hover_pos = pos.x(), pos.y()
+        self.show_velocity_at(*self._hover_pos)
 
     def _on_click(self, ev) -> None:
         if ev.double() or self._shots_sou_x.size == 0:

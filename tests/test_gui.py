@@ -3,16 +3,17 @@ import math
 
 import numpy as np
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from refrac.dialogs import NewLineDialog
 from refrac.export import EXPORT_COLUMNS
+from refrac.layer_chart import LayerChart
 from refrac.main_window import MainWindow
 from refrac.pick_chart import DRAWER_NAMES, ERASER, ZOOM, PickChart
 from refrac.storage import Line, Project
-from refrac.structs import UNDEFINED_POINT
+from refrac.structs import UNDEFINED_POINT, Station
 
 LEFT = Qt.MouseButton.LeftButton
 RIGHT = Qt.MouseButton.RightButton
@@ -215,8 +216,64 @@ def test_reopened_line_plots_saved_interfaces(window, tmp_path):
     window.save_plot()
     saved_interfaces = window.layer_chart.interface_points
     home_dir = window.line.home_dir
+    x, elevation1, _, _ = saved_interfaces[221]
+    window.layer_chart.show_velocity_at(x, elevation1 - 1)
+    saved_velocity = hover_velocity_text(window.layer_chart)
     window.set_line(Line.open(home_dir))
     assert window.layer_chart.interface_points == saved_interfaces
+    window.layer_chart.show_velocity_at(x, elevation1 - 1)
+    assert hover_velocity_text(window.layer_chart) == saved_velocity
+
+
+def hover_velocity_text(layer_chart: LayerChart) -> str:
+    return layer_chart._hover_text.textItem.toPlainText().strip()
+
+
+def test_layer_chart_shows_the_velocity_of_the_layer_under_the_mouse(window):
+    window.try_change_shot(MIDDLE_SHOT)
+    window.pick_chart.set_draw_points(draw_points_on_picks(window.main_shot))
+    window.pick_chart.fit_all()
+    window.save_plot()
+    velocities = window.line.load_all_interpretations()[MIDDLE_SHOT][5:8]
+    layer_chart = window.layer_chart
+    x, elevation1, elevation2, elevation3 = layer_chart.interface_points[221]
+    tops = [window.main_shot.sou_elev, elevation1, elevation2]
+    bottoms = [elevation1, elevation2, elevation3]
+    for y, interface in [(elevation1 + 1, 1), ((elevation1 + elevation2) / 2, 2),
+                         ((elevation2 + elevation3) / 2, 3), (elevation3 - 50, 3)]:
+        # Only x matters within a layer, and station 221 is the only one interpreted
+        assert layer_chart.velocity_target(x + 1000, y) == (221, interface)
+        layer_chart.show_velocity_at(x + 1000, y)
+        assert layer_chart._hover_segment.isVisible() and layer_chart._hover_text.isVisible()
+        segment_x, segment_y = layer_chart._hover_segment.getData()
+        assert list(segment_x) == [x, x]
+        assert list(segment_y) == [tops[interface - 1], bottoms[interface - 1]]
+        assert hover_velocity_text(layer_chart) == f"{velocities[interface - 1]:.0f} m/s"
+
+    layer_chart._on_mouse_moved(QPointF(-1e6, -1e6))  # outside the plot
+    assert not layer_chart._hover_segment.isVisible()
+    layer_chart.show_velocity_at(x, elevation1)
+    layer_chart.leaveEvent(QEvent(QEvent.Type.Leave))
+    assert not layer_chart._hover_segment.isVisible() and not layer_chart._hover_text.isVisible()
+
+
+def test_layer_chart_velocity_falls_back_to_the_interfaces_above(qtbot):
+    stations = [Station(1, 0.0, 0.0, 100.0), Station(2, 100.0, 0.0, 100.0)]
+    layer_chart = LayerChart(stations, [])
+    qtbot.addWidget(layer_chart)
+    assert layer_chart.velocity_target(0.0, 50.0) is None
+
+    # Below the only interface there is, layer 1 is shown
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [500.0, 2000.0, 0.0], stations[0])
+    assert layer_chart.velocity_target(0.0, 50.0) == (1, 1)
+
+    # Below interface 2, layer 2 is shown even under a station without it
+    layer_chart.plot_layer_thickness([10.0, 20.0, 0.0], [500.0, 2000.0, 3000.0], stations[1])
+    assert layer_chart.velocity_target(0.0, 50.0) == (2, 2)
+    assert layer_chart.velocity_target(0.0, 95.0) == (1, 1)
+
+    layer_chart.plot_layer_thickness([0.0] * 3, [0.0] * 3, stations[1])
+    assert layer_chart.velocity_target(100.0, 50.0) == (1, 1)
 
 
 def test_interfaces_and_source_hang_from_the_sou_elev_column(window, tmp_path, sou_elev_picks):
