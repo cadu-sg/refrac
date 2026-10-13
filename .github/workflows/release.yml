@@ -6,8 +6,8 @@
 # always come from the commit the workflow runs on, so an older tag can be
 # built with newer packaging.
 #
-# A push that changes the packaging builds and tests the current commit,
-# without releasing anything.
+# A push to a branch that changes the packaging builds and tests the current
+# commit, without releasing anything.
 name: Release
 
 on:
@@ -17,6 +17,9 @@ on:
         description: Tag to build and attach to its release (e.g. v1.0)
         required: true
   push:
+    # Branches only: a pushed tag, release or not, builds nothing
+    branches:
+      - "**"
     paths:
       - packaging/**
       - .github/workflows/release.yml
