@@ -39,11 +39,22 @@ From now on, start refrac from the **Start menu** or from the **refrac** icon on
 ## Getting started
 
 1. **Project → New Project...** creates a project folder. A project holds any number of seismic lines.
-2. **Line → New Line...** asks for a title and a picks file. To try refrac out, use the sample file [synthetic_picks.dat](https://github.com/cadu-sg/refrac/blob/main/testdata/synthetic_picks.dat) (25 shots, 240 stations): open the link and click the **Download raw file** button at the top right of the file.
+2. **Line → New Line...** asks for a title and a picks file. To try refrac out, use the [example data](#example-data).
 3. Step through the shots and draw the direct-wave and refracted-arrival lines over each travel-time curve. refrac computes velocities and thicknesses as you draw.
 4. Click **Save** after interpreting each shot. **Line → Export Interpretation...** writes a CSV file with one row per saved shot. Its columns are `FFID`, `SOU_SLOC`, `SOU_X`, `SOU_Y` and `SOU_ELEV` for the source, `V1` for the direct-wave velocity, `V2` to `V4` for the refracted-arrival velocities (m/s) and `Z1` to `Z3` for the elevations of the interfaces. A velocity averages the slowness of both sides of the shot, or uses the only side drawn. Values that can't be computed are left empty.
 
 Your work is saved inside the project folder. Next time, use **Project → Open Project...** and **Line → Open Line...** to continue.
+
+### Example data
+
+To try refrac out without picks of your own, use the example data: a seismic line of 301 shots and 321 stations. It's on the [Example data](https://github.com/cadu-sg/refrac/releases/tag/example-data) page of the releases.
+
+1. Download [first_break_picks_example_1.zip](https://github.com/cadu-sg/refrac/releases/download/example-data/first_break_picks_example_1.zip) (about 1 MB).
+2. Unzip it to get the picks file, `first_break_picks_example_1.csv`. On Windows, right-click the downloaded file and choose **Extract All...**. On Linux, right-click it and choose **Extract Here** (the wording depends on your system), or run `unzip first_break_picks_example_1.zip` in a terminal.
+3. In refrac, create a project with **Project → New Project...**, or open one with **Project → Open Project...**.
+4. Choose **Line → New Line...** and type a title for the line. Click the **...** button next to **Picks File**, select `first_break_picks_example_1.csv`, and click **OK**.
+
+refrac shows the first shot of the line. Continue from step 3 of [Getting started](#getting-started).
 
 ### Picks file format
 
@@ -67,7 +78,7 @@ A text file with one first-break pick per row. The first line is a header naming
 - Without a `SOU_ELEV` column, a source takes the elevation of the receiver station with its station number.
 - A shot is a run of consecutive rows with the same `FFID`.
 
-Open the sample file [synthetic_picks.dat](https://github.com/cadu-sg/refrac/blob/main/testdata/synthetic_picks.dat) for an example.
+For an example, see the [example data](#example-data), which uses semicolons and decimal commas.
 
 ## Updating
 
