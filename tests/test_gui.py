@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from refrac.dialogs import NewLineDialog
 from refrac.export import EXPORT_COLUMNS
-from refrac.layer_chart import LAYER_COLORMAPS, LayerChart
+from refrac.layer_chart import DEFAULT_DEPTH, LAYER_COLORMAPS, LayerChart
 from refrac.main_window import MainWindow
 from refrac.pick_chart import DRAWER_NAMES, ERASER, ZOOM, PickChart
 from refrac.storage import Line, Project
@@ -287,6 +287,32 @@ def test_layer_colors_follow_the_velocities_of_each_layer(qtbot):
         layer_chart.plot_layer_thickness([UNDEFINED] * 3, [UNDEFINED] * 3, station)
     layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [601.0, 2000.0, 0.0], stations[3])
     assert point_lightnesses(layer_chart, 1) == pytest.approx([middle] * 2, abs=0.02)
+
+
+def view_bottom(layer_chart: LayerChart) -> float:
+    return layer_chart._plot_widget.getPlotItem().getViewBox().viewRange()[1][0]
+
+
+def test_layer_chart_bottom_defaults_below_the_lowest_station_and_can_be_set(qtbot):
+    stations = [Station(num, 100.0 * num, 0.0, 100.5 + num) for num in range(4)]
+    layer_chart = LayerChart(stations, [])
+    qtbot.addWidget(layer_chart)
+    assert layer_chart.bottom == view_bottom(layer_chart) == pytest.approx(100 - DEFAULT_DEPTH)
+
+    layer_chart.set_bottom(-50.0)
+    # A deeper interface doesn't move the bottom
+    layer_chart.plot_layer_thickness([500.0, 0.0, 0.0], [600.0, 0.0, 0.0], stations[0])
+    assert layer_chart.bottom == view_bottom(layer_chart) == pytest.approx(-50)
+
+
+def test_layer_chart_bottom_spin_box(window):
+    lowest = min(station.elev for station in window.line.stations)
+    assert window._layer_bottom.value() == math.floor(lowest) - DEFAULT_DEPTH
+    assert view_bottom(window.layer_chart) == pytest.approx(window._layer_bottom.value())
+
+    window._layer_bottom.setValue(-300)
+    assert window.layer_chart.bottom == -300
+    assert view_bottom(window.layer_chart) == pytest.approx(-300)
 
 
 def fill_outline(fill) -> list[tuple[float, float]]:
