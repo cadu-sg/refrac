@@ -4,6 +4,8 @@ A desktop application for **seismic refraction interpretation**. Load the first-
 
 ## Download
 
+The current version is **1.1** ([what's new](https://github.com/cadu-sg/refrac/releases/tag/v1.1)).
+
 <p>
   <a href="https://github.com/cadu-sg/refrac/releases/latest/download/refrac-windows-setup.exe"><img src="docs/images/download-windows.svg" alt="Download for Windows" width="336" height="72"></a>
   &nbsp;
