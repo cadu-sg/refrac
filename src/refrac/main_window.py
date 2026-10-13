@@ -172,12 +172,19 @@ class MainWindow(QMainWindow):
         self._line_width = _spin_box(default.line_width, 0.5, 20, " px")
         self._symbol_color = ColorButton(default.symbol_color)
         self._line_color = ColorButton(default.line_color)
+        # Set to the line's default when it loads
+        self._layer_bottom = _spin_box(0, -100_000, 100_000, " m")
+        self._layer_bottom.setDecimals(0)
+        self._layer_bottom.setSingleStep(100)
+        # Applied on Enter or focus loss, not at each digit typed
+        self._layer_bottom.setKeyboardTracking(False)
 
         form.addRow("Toggle", toggles)
         form.addRow("Symbol size", self._symbol_size)
         form.addRow("Line width", self._line_width)
         form.addRow("Symbol color", self._symbol_color)
         form.addRow("Line color", self._line_color)
+        form.addRow("Layer chart bottom", self._layer_bottom)
 
         for toggle in (self._symbols_toggle, self._line_toggle):
             toggle.toggled.connect(self._on_layout_changed)
@@ -185,6 +192,7 @@ class MainWindow(QMainWindow):
             spin_box.valueChanged.connect(self._on_layout_changed)
         for color_button in (self._symbol_color, self._line_color):
             color_button.colorChanged.connect(self._on_layout_changed)
+        self._layer_bottom.valueChanged.connect(self._on_layer_bottom_changed)
         return box
 
     def _build_interpretation_box(self) -> QGroupBox:
@@ -282,6 +290,10 @@ class MainWindow(QMainWindow):
 
         self.layer_chart = LayerChart(line.stations, line.shots_metadata)
         self.layer_chart.shotClicked.connect(self.try_change_shot)
+        with QSignalBlocker(self._layer_bottom):
+            # The bottom stays below the surface
+            self._layer_bottom.setMaximum(self.layer_chart.top - 1)
+            self._layer_bottom.setValue(self.layer_chart.bottom)
 
         self._charts.addWidget(self.pick_chart)
         self._charts.addWidget(self.layer_chart)
@@ -546,6 +558,10 @@ class MainWindow(QMainWindow):
         self._line_color.setEnabled(line_visible)
         if self.pick_chart is not None:
             self.pick_chart.set_pick_style(self._pick_style())
+
+    def _on_layer_bottom_changed(self, value: float) -> None:
+        if self.layer_chart is not None:
+            self.layer_chart.set_bottom(value)
 
     def _on_tool_toggled(self, tool: str, checked: bool) -> None:
         if self.pick_chart is None:

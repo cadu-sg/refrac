@@ -21,6 +21,8 @@ LAYER_COLORMAPS = tuple(pg.ColorMap(None, [pg.mkColor(color) for color in colors
 MIN_RELATIVE_SPAN = 0.1
 FILL_ALPHA = 170
 HOVER_FONT_SIZE = 8  # pt
+DEFAULT_DEPTH = 1000  # m: default bottom of the chart below the lowest station
+TOP_MARGIN = 0.05  # fraction of the elevation range left above the highest point
 
 
 class LayerChart(QWidget):
@@ -37,6 +39,9 @@ class LayerChart(QWidget):
     Hovering the chart shows the velocity of a layer below one shot: the shot nearest to the
     mouse along x, and the layer the mouse is in (the deepest interface stands for the layers
     below it). A thin segment spans the layer, from its interface point up to the point above.
+
+    The y axis spans from the bottom elevation, DEFAULT_DEPTH below the lowest station (floored to the metre) unless
+    set_bottom changes it, up to the highest station or source. The x axis autoranges.
     """
 
     shotClicked = Signal(int)
@@ -99,6 +104,18 @@ class LayerChart(QWidget):
         self._shots_sou_x = np.array([shot.sou_x for shot in shots_metadata], dtype=float)
         self._plot_widget.scene().sigMouseClicked.connect(self._on_click)
         self._plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
+
+        # Elevation of the highest point on the chart: the interfaces are below the surface
+        self.top = max([*self._surface_elev, *(shot.sou_elev for shot in shots_metadata)])
+        # A whole metre, as the bottom is set in whole metres
+        self.set_bottom(float(np.floor(self._surface_elev.min())) - DEFAULT_DEPTH)
+
+    def set_bottom(self, elevation: float) -> None:
+        """Sets the elevation at the bottom of the chart, which should be below self.top."""
+        self.bottom = elevation
+        margin = TOP_MARGIN * (self.top - elevation)
+        self._plot_widget.getPlotItem().getViewBox().setYRange(elevation, self.top + margin,
+                                                               padding=0)
 
     def plot_layer_thickness(self, thicknesses: list[float], velocities: list[float],
                              station: Station) -> None:
