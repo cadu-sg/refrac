@@ -15,9 +15,6 @@ from refrac.pick_chart import DRAWER_NAMES, ERASER, ZOOM, PickChart
 from refrac.storage import Line, Project
 from refrac.structs import UNDEFINED, UNDEFINED_POINT, Station
 
-LEFT = Qt.MouseButton.LeftButton
-RIGHT = Qt.MouseButton.RightButton
-
 MIDDLE_SHOT = 12  # station 221
 # Offsets well inside each branch of the middle shot's first arrivals
 SEGMENTS = {
@@ -32,6 +29,8 @@ def window(qtbot, tmp_path, synthetic_picks):
     qtbot.addWidget(window)
     window.errors = []
     window._show_error = lambda header, content: window.errors.append((header, content))
+    window.warnings = []
+    window._show_warning = lambda header, content: window.warnings.append((header, content))
     project = Project.create(tmp_path / "project")
     window.set_project(project)
     window.set_line(project.create_line("line", synthetic_picks))
@@ -185,11 +184,11 @@ def test_go_to_shot_and_layer_chart_navigation(window):
 
 def test_single_active_tool(window):
     chart = window.pick_chart
-    window._tool_buttons["head1L"].setChecked(True)
-    assert chart.active_tool == "head1L" and chart.drawer("head1L").enabled
+    window._tool_buttons["directL"].setChecked(True)
+    assert chart.active_tool == "directL" and chart.drawer("directL").enabled
     window._tool_buttons[ZOOM].setChecked(True)
     assert chart.active_tool == ZOOM
-    assert not window._tool_buttons["head1L"].isChecked() and not chart.drawer("head1L").enabled
+    assert not window._tool_buttons["directL"].isChecked() and not chart.drawer("directL").enabled
     window._tool_buttons[ZOOM].setChecked(False)
     assert chart.active_tool is None
 
@@ -373,6 +372,74 @@ def test_undetectable_decimal_separator_is_reported(window, tmp_path, synthetic_
     assert not (window.project.home_dir / "mixed").exists()
 
 
+def test_lines_are_drawn_from_the_shot_outwards(window):
+    chart = window.pick_chart
+    buttons = window._tool_buttons
+    enabled = lambda: {name for name in DRAWER_NAMES if buttons[name].isEnabled()}
+    assert enabled() == {"directL", "directR"}
+    chart.set_active_tool("head2L")
+    assert chart.active_tool is None
+
+    # Each side unlocks on its own
+    chart.drawer("directL").set_points((0, 0), (-15, 25))
+    assert enabled() == {"directL", "directR", "head1L"}
+    buttons["head1R"].setChecked(True)
+    assert chart.active_tool is None and not buttons["head1R"].isChecked()
+    chart.drawer("head1L").set_points((-85, 70), (-35, 45))
+    assert enabled() == {"directL", "directR", "head1L", "head2L"}
+
+
+def test_inner_line_cannot_be_removed(window, qtbot):
+    window.show()
+    qtbot.waitExposed(window)
+    chart = window.pick_chart
+    chart.zoom_to(-200, 0, 0, 120)
+    lines = {"directL": ((0, 0), (-15, 25)), "head1L": ((-85, 70), (-35, 45)),
+             "head2L": ((-160, 100), (-110, 85))}
+    for name, line in lines.items():
+        chart.drawer(name).set_points(*line)
+    head1L = chart.drawer("head1L")
+    saved_points = chart.get_draw_points()
+
+    # One right click erases an end point, to place it again
+    chart._right_click((-36, 44))
+    assert chart.active_tool == "head1L"
+    assert head1L.p1 == (-85, 70) and head1L.p2 is None
+    chart._left_click((-30, 42))
+    assert head1L.drawn and head1L.p2 == (-30, 42)
+
+    # The second right click, which would remove the line, is refused wherever it is
+    chart._right_click((-31, 41))
+    chart._right_click((-150, 5))
+    assert head1L.p1 == (-85, 70) and head1L.p2 is None
+    assert window.warnings == [("Cannot remove Refracted 1 (left)",
+                                "Refracted 2 (left) is drawn outside it. Remove the lines starting "
+                                "from the outermost one")]
+    # Meanwhile the line keeps its last end points, and gets them back when deselected
+    assert chart.get_draw_points()[4:6] == [(-85, 70), (-30, 42)]
+    chart.set_active_tool(ZOOM)
+    assert head1L.drawn and (head1L.p1, head1L.p2) == ((-85, 70), (-30, 42))
+
+    # The direct wave stays too
+    chart._right_click((-14, 24))
+    assert chart.active_tool == "directL" and chart.drawer("directL").p2 is None
+    chart._right_click((-150, 5))
+    assert window.warnings[-1][0] == "Cannot remove Direct (left)"
+    chart.set_active_tool(None)
+    assert chart.drawer("directL").p2 == (-15, 25)
+
+    # The outermost line can be removed, then the one inside it
+    chart._right_click((-158, 99))
+    chart._right_click((-50, 5))
+    assert chart.drawer("head2L").p1 is None
+    chart._right_click((-84, 70))
+    chart._right_click((-150, 5))
+    assert head1L.p1 is None and chart.active_tool == "head1L"
+    assert len(window.warnings) == 2
+    assert not window._tool_buttons["head2L"].isEnabled()
+    assert chart.get_draw_points() != saved_points
+
+
 @pytest.fixture
 def chart(qtbot):
     chart = PickChart()
@@ -381,22 +448,27 @@ def chart(qtbot):
 
 
 def test_standard_drawer_clicks(chart):
+    chart.drawer("directR").set_points((0, 0), (20, 50))
     drawer = chart.drawer("head1R")
     chart.set_active_tool("head1R")
-    drawer.click((30, 40), LEFT)
-    assert drawer.p1 == (30, 40) and not drawer.drawn
-    drawer.click((90, 70), LEFT)
+    drawer.click((30, 40))
+    assert drawer.p1 == (30, 40) and drawer.pending and not drawer.drawn
+    drawer.click((90, 70))
     assert drawer.drawn and drawer.slope == pytest.approx(0.5) and drawer.intercept == 25
 
-    # Right click erases the nearest end point, a left click draws it again
-    drawer.click((80, 0), RIGHT)
-    assert (drawer.p1, drawer.p2, drawer.drawn) == ((30, 40), None, False)
+    # Erasing an end point leaves the line pending, a left click draws it again
+    drawer.erase_end_point(1, (80, 0))
+    assert (drawer.p1, drawer.p2, drawer.drawn) == ((30, 40), None, False) and drawer.pending
     assert drawer.slope == 0
-    drawer.click((100, 75), LEFT)
+    drawer.click((100, 75))
     assert drawer.p2 == (100, 75) and drawer.drawn
+    drawer.erase_end_point(0, (0, 0))  # the other end point is kept as p1
+    assert drawer.p1 == (100, 75) and drawer.p2 is None
+    drawer.discard_point()
+    assert drawer.p1 is None and not drawer.pending
 
     # Deactivating with a single point placed discards it
-    drawer.click((0, 0), RIGHT)
+    drawer.click((30, 40))
     chart.set_active_tool(None)
     assert drawer.p1 is None and drawer.p2 is None
 
@@ -414,14 +486,16 @@ def test_standard_drawer_drag(chart):
 def test_origin_fixed_drawer(chart):
     drawer = chart.drawer("directL")
     chart.set_active_tool("directL")
-    assert drawer.p1 == (0, 0) and drawer._mirror.isVisible()
-    drawer.click((-20, 30), LEFT)
+    assert not drawer.pending and drawer._mirror.isVisible()
+    drawer.click((-20, 30))
     assert drawer.drawn and drawer.slope == -1.5 and not drawer._mirror.isVisible()
     assert drawer.draggable_points() == [(1, (-20, 30))]
-    drawer.click((-5, 0), RIGHT)
-    assert drawer.p2 is None and not drawer.drawn
+    drawer.erase_end_point(1, (-5, 0))
+    assert drawer.p1 == (0, 0) and drawer.p2 is None and drawer.pending and not drawer.drawn
+    drawer.discard_point()
+    assert drawer.p1 is None and drawer._mirror.isVisible()
     chart.set_active_tool(None)
-    assert drawer.p1 is None
+    assert not drawer._mirror.isVisible()
     assert chart.get_draw_points() == [UNDEFINED_POINT] * 14
 
 
@@ -433,8 +507,41 @@ def test_draw_points_packing(chart):
     assert chart.drawer("head3R").p2 == points[13]
     # Incomplete lines are not part of the draw points
     chart.set_active_tool("head3L")
-    chart.drawer("head3L").click((-50, 50), RIGHT)
+    chart.drawer("head3L").erase_end_point(0, (-50, 50))
     assert chart.get_draw_points()[:2] == [UNDEFINED_POINT] * 2
+
+
+def test_right_click_erases_the_nearest_point_of_any_line(chart, qtbot):
+    chart.resize(800, 600)
+    chart.show()
+    qtbot.waitExposed(chart)
+    chart.zoom_to(0, 200, 0, 120)
+    refused = []
+    chart.lineRemovalRefused.connect(lambda name, outer: refused.append((name, outer)))
+    chart._right_click((100, 50))  # without lines, nothing to erase
+    assert chart.active_tool is None
+
+    lines = {"directR": ((0, 0), (15, 25)), "head1R": ((35, 45), (85, 70)),
+             "head2R": ((110, 85), (160, 100))}
+    for name, line in lines.items():
+        chart.drawer(name).set_points(*line)
+    chart.set_active_tool("head2R")
+
+    # The nearest end point is erased whichever line is selected, and its line selected
+    head1R = chart.drawer("head1R")
+    chart._right_click((37, 47))
+    assert chart.active_tool == "head1R"
+    assert head1R.p1 == (85, 70) and head1R.p2 is None
+    # The next right click goes to that line, even next to another one
+    chart._right_click((159, 99))
+    assert refused == [("head1R", "head2R")] and head1R.pending
+    chart._left_click((30, 42))
+    assert head1R.drawn and chart.drawer("head2R").drawn
+
+    # Whatever the tool
+    chart.set_active_tool(ZOOM)
+    chart._right_click((16, 24))
+    assert chart.active_tool == "directR" and chart.drawer("directR").pending
 
 
 def test_zoom_and_reset(chart):

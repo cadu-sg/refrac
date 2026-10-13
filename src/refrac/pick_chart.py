@@ -26,6 +26,12 @@ WAVES = (("Direct", "directL", "directR"),
          ("Refracted 2", "head2L", "head2R"),
          ("Refracted 3", "head3L", "head3R"))
 
+# Lines are drawn from the shot outwards on each side: each head wave drawer's neighbour towards
+# the shot, on the same side, and the reverse
+INNER_NEIGHBOURS = {outer[side]: inner[side]
+                    for inner, outer in zip(WAVES, WAVES[1:]) for side in (1, 2)}
+OUTER_NEIGHBOURS = {inner: outer for outer, inner in INNER_NEIGHBOURS.items()}
+
 # Color and symbol of each wave, a drawer name being its wave plus its side (L or R)
 WAVE_STYLES = {
     "direct": ("#F3622D", "s"),
@@ -53,6 +59,14 @@ ERASER_COLOR = (224, 29, 29)
 
 def wave_style(drawer_name: str) -> tuple[str, str]:
     return WAVE_STYLES[drawer_name[:-1]]
+
+
+def drawer_title(drawer_name: str) -> str:
+    """The wave title and side of a drawer, as in "Refracted 1 (left)"."""
+    for title, left, right in WAVES:
+        if drawer_name in (left, right):
+            return f"{title} ({'left' if drawer_name == left else 'right'})"
+    raise KeyError(drawer_name)
 
 
 def unpack_draw_points(points: list[Point]) -> dict[str, tuple[Point, Point] | None]:
@@ -103,13 +117,18 @@ class PickChart(QWidget):
     """Plots the picks of the loaded shots and hosts the tools that act on them: the eight line
     drawers, zoom and the pick eraser. At most one tool is active at a time.
 
-    The end points of drawn lines can be dragged whatever the active tool. Vertical markers show
-    where adjacent lines intersect.
+    The end points of drawn lines can be dragged whatever the active tool, and a right click
+    erases the end point nearest to it, selecting its line. Vertical markers show where adjacent
+    lines intersect.
+
+    On each side, lines are drawn from the shot outwards: a head wave can only be drawn once the
+    line inside it is, and a line can't be removed while the line outside it is drawn.
     """
 
     drawingsChanged = Signal()
     activeToolChanged = Signal(object)  # tool name, or None
     zoomedChanged = Signal(bool)
+    lineRemovalRefused = Signal(str, str)  # the drawer whose line was kept, its outer neighbour
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -255,11 +274,16 @@ class PickChart(QWidget):
     # Tools
 
     def set_active_tool(self, tool: str | None) -> None:
-        """Activates a tool, ZOOM, ERASER or a drawer name, deactivating the previous one."""
-        if tool == self.active_tool:
+        """Activates a tool, ZOOM, ERASER or a drawer name, deactivating the previous one. A
+        drawer that can't be drawn yet is not activated."""
+        if tool == self.active_tool or (tool in self._drawers and not self.can_draw(tool)):
             return
         if self.active_tool in self._drawers:
-            self._drawers[self.active_tool].set_enabled(False)
+            previous = self._drawers[self.active_tool]
+            # Deactivating discards an incomplete line, but an inner line has to stay
+            if not previous.complete and self._must_keep_line(self.active_tool):
+                previous.restore_line()
+            previous.set_enabled(False)
         self.active_tool = tool
         if tool in self._drawers:
             self._drawers[tool].set_enabled(True)
@@ -272,6 +296,19 @@ class PickChart(QWidget):
 
     def drawer(self, name: str) -> LineDrawer:
         return self._drawers[name]
+
+    def can_draw(self, name: str) -> bool:
+        """Whether the drawer can be activated: the direct waves always, a head wave once the line
+        inside it on its side is complete. A line already there can always be edited."""
+        inner = INNER_NEIGHBOURS.get(name)
+        return inner is None or self._drawers[inner].complete or self._drawers[name].complete
+
+    def _must_keep_line(self, name: str) -> bool:
+        """Whether the drawer had a line and the line outside it on its side is complete, so its
+        own line can't be removed."""
+        outer = OUTER_NEIGHBOURS.get(name)
+        return (self._drawers[name].last_line is not None
+                and outer is not None and self._drawers[outer].complete)
 
     def slopes(self) -> dict[str, float]:
         return {name: drawer.slope for name, drawer in self._drawers.items()}
@@ -286,10 +323,16 @@ class PickChart(QWidget):
 
     def get_draw_points(self) -> list[Point]:
         """The 14 points defining the lines, packed in the draw_points.bin order. The direct
-        waves only contribute their free end point, and incomplete lines are UNDEFINED."""
+        waves only contribute their free end point, and incomplete lines are UNDEFINED, except an
+        inner line being redrawn, which keeps its last complete end points."""
         points = []
         for name, drawer in self._drawers.items():
-            p1, p2 = (drawer.p1, drawer.p2) if drawer.complete else (UNDEFINED_POINT, UNDEFINED_POINT)
+            if drawer.complete:
+                p1, p2 = drawer.p1, drawer.p2
+            elif self._must_keep_line(name):
+                p1, p2 = drawer.last_line
+            else:
+                p1, p2 = UNDEFINED_POINT, UNDEFINED_POINT
             points += [p2] if name in DIRECT_NAMES else [p1, p2]
         return points
 
@@ -333,10 +376,35 @@ class PickChart(QWidget):
         return pos.x(), pos.y()
 
     def _on_click(self, ev) -> None:
-        drawer = self._drawers.get(self.active_tool)
-        if drawer is not None:
-            drawer.click(self._view_pos(ev.scenePos()), ev.button())
-            self._update_cursor(ev.scenePos())
+        self._click(self._view_pos(ev.scenePos()), ev.button())
+        self._update_cursor(ev.scenePos())
+
+    def _click(self, pos: Point, button: Qt.MouseButton) -> None:
+        if button == Qt.MouseButton.LeftButton:
+            self._left_click(pos)
+        elif button == Qt.MouseButton.RightButton:
+            self._right_click(pos)
+
+    def _left_click(self, pos: Point) -> None:
+        if self.active_tool in self._drawers:
+            self._drawers[self.active_tool].click(pos)
+
+    def _right_click(self, pos: Point) -> None:
+        """Erases a line end point, whatever the active tool. While the active line is pending,
+        the click removes its remaining point wherever it is. Otherwise it erases the end point
+        nearest to it among all lines, and selects that line so a left click places it again."""
+        active = self._drawers.get(self.active_tool)
+        if active is not None and active.pending:
+            if self._must_keep_line(self.active_tool):
+                self.lineRemovalRefused.emit(self.active_tool, OUTER_NEIGHBOURS[self.active_tool])
+            else:
+                active.discard_point()
+            return
+        nearest = self._nearest_end_point(self._view_box.mapViewToScene(QPointF(*pos)))
+        if nearest is not None:
+            name, index, _ = nearest
+            self.set_active_tool(name)
+            self._drawers[name].erase_end_point(index, pos)
 
     def _on_drag(self, ev) -> None:
         if ev.isStart():
@@ -361,9 +429,9 @@ class PickChart(QWidget):
         left = ev.button() == Qt.MouseButton.LeftButton
         grabbed = self._end_point_at(press) if left else None
         if grabbed is not None:
-            drawer, index = grabbed
-            drawer.start_drag(index)
-            self._dragged_drawer = drawer
+            name, index, _ = grabbed
+            self._dragged_drawer = self._drawers[name]
+            self._dragged_drawer.start_drag(index)
         elif left and self.active_tool in (ZOOM, ERASER):
             self._band_tool = self.active_tool
             self._band_start = self._clamp_to_view(self._view_pos(press))
@@ -372,9 +440,9 @@ class PickChart(QWidget):
             self._rubber_band.setBrush(pg.mkBrush((*color, 51)))
             self._rubber_band.setRect(QRectF(QPointF(*self._band_start), QPointF(*self._band_start)))
             self._rubber_band.show()
-        elif self.active_tool in self._drawers:
-            # A press that moved a little is still a click for the drawer
-            self._drawers[self.active_tool].click(self._view_pos(press), ev.button())
+        else:
+            # A press that moved a little is still a click
+            self._click(self._view_pos(press), ev.button())
 
     def _apply_band(self, start: Point, end: Point) -> None:
         x_min, x_max = sorted((start[0], end[0]))
@@ -392,16 +460,22 @@ class PickChart(QWidget):
         (x_min, x_max), (y_min, y_max) = self._view_box.viewRange()
         return min(max(pos[0], x_min), x_max), min(max(pos[1], y_min), y_max)
 
-    def _end_point_at(self, scene_pos: QPointF) -> tuple[LineDrawer, int] | None:
-        """The draggable line end point within GRAB_RADIUS of the position, if any."""
+    def _nearest_end_point(self, scene_pos: QPointF) -> tuple[str, int, float] | None:
+        """The end point of a complete line nearest to the position, as (drawer name, point index,
+        distance in px), or None without lines."""
         nearest = None
-        for drawer in self._drawers.values():
+        for name, drawer in self._drawers.items():
             for index, point in drawer.draggable_points():
                 pos = self._view_box.mapViewToScene(QPointF(*point))
                 distance = math.hypot(pos.x() - scene_pos.x(), pos.y() - scene_pos.y())
-                if distance <= GRAB_RADIUS and (nearest is None or distance < nearest[0]):
-                    nearest = (distance, drawer, index)
-        return None if nearest is None else nearest[1:]
+                if nearest is None or distance < nearest[2]:
+                    nearest = (name, index, distance)
+        return nearest
+
+    def _end_point_at(self, scene_pos: QPointF) -> tuple[str, int, float] | None:
+        """The draggable line end point within GRAB_RADIUS of the position, if any."""
+        nearest = self._nearest_end_point(scene_pos)
+        return nearest if nearest is not None and nearest[2] <= GRAB_RADIUS else None
 
     def _on_mouse_moved(self, scene_pos: QPointF) -> None:
         pos = self._view_pos(scene_pos)

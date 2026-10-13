@@ -14,8 +14,8 @@ from refrac.dialogs import NewLineDialog, NewProjectDialog
 from refrac.export import export_rows, write_export_csv
 from refrac.interpretation import average_velocity, compute_interpretation, velocity
 from refrac.layer_chart import LayerChart
-from refrac.pick_chart import (DRAWER_NAMES, ERASER, HEAD_NAMES, WAVES, ZOOM, PickChart,
-                               PickStyle, wave_style)
+from refrac.pick_chart import (DRAWER_NAMES, ERASER, HEAD_NAMES, INNER_NEIGHBOURS, WAVES, ZOOM,
+                               PickChart, PickStyle, drawer_title, wave_style)
 from refrac.storage import Line, Project
 from refrac.structs import UNDEFINED, Point, Shot, is_point_defined
 
@@ -201,7 +201,11 @@ class MainWindow(QMainWindow):
                 radio = QRadioButton()
                 # Clicking the selected line again unselects it
                 radio.setAutoExclusive(False)
-                radio.setToolTip(f"Draw {title} ({side})")
+                tooltip = f"Draw {title} ({side})"
+                if name in INNER_NEIGHBOURS:
+                    # Lines are drawn from the shot outwards
+                    tooltip += f", after {drawer_title(INNER_NEIGHBOURS[name])}"
+                radio.setToolTip(tooltip)
                 fit = QPushButton("Fit")
                 fit.setToolTip(f"Least-squares fit of {title} ({side}) to the picks between its "
                                f"intersections (F)")
@@ -274,6 +278,7 @@ class MainWindow(QMainWindow):
         self.pick_chart.drawingsChanged.connect(self._on_drawings_changed)
         self.pick_chart.activeToolChanged.connect(self._sync_tool_buttons)
         self.pick_chart.zoomedChanged.connect(self._zoom_hint.setVisible)
+        self.pick_chart.lineRemovalRefused.connect(self._on_line_removal_refused)
 
         self.layer_chart = LayerChart(line.stations, line.shots_metadata)
         self.layer_chart.shotClicked.connect(self.try_change_shot)
@@ -549,6 +554,8 @@ class MainWindow(QMainWindow):
             self.pick_chart.set_active_tool(tool)
         elif self.pick_chart.active_tool == tool:
             self.pick_chart.set_active_tool(None)
+        # The chart refuses a line that can't be drawn yet
+        self._sync_tool_buttons(self.pick_chart.active_tool)
 
     def _sync_tool_buttons(self, active_tool: str | None) -> None:
         for tool, button in self._tool_buttons.items():
@@ -560,6 +567,8 @@ class MainWindow(QMainWindow):
         drawn = {name: chart is not None and chart.drawer(name).drawn for name in DRAWER_NAMES}
         for name, button in self._fit_buttons.items():
             button.setEnabled(drawn[name])
+            self._tool_buttons[name].setEnabled(
+                chart.can_draw(name) if chart is not None else name not in INNER_NEIGHBOURS)
         self._fit_all_button.setEnabled(any(drawn.values()))
 
         slopes = chart.slopes() if chart is not None else dict.fromkeys(DRAWER_NAMES, UNDEFINED)
@@ -578,12 +587,22 @@ class MainWindow(QMainWindow):
         if self.pick_chart is not None and self._interpretation_box.isEnabled():
             self.pick_chart.fit_selected()
 
+    def _on_line_removal_refused(self, name: str, outer_name: str) -> None:
+        self._show_warning(f"Cannot remove {drawer_title(name)}",
+                           f"{drawer_title(outer_name)} is drawn outside it. Remove the lines "
+                           f"starting from the outermost one")
+
     def _on_escape(self) -> None:
         if self.pick_chart is not None:
             self.pick_chart.reset_zoom()
 
     def _show_error(self, header: str, content: str) -> None:
         box = QMessageBox(QMessageBox.Icon.Critical, "Error", header, parent=self)
+        box.setInformativeText(content)
+        box.exec()
+
+    def _show_warning(self, header: str, content: str) -> None:
+        box = QMessageBox(QMessageBox.Icon.Warning, "Warning", header, parent=self)
         box.setInformativeText(content)
         box.exec()
 

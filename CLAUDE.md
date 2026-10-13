@@ -59,6 +59,8 @@ head3L, head2L, head1L, directL, directR, head1R, head2R, head3R
 
 `slope` and `intercept` are computed properties, UNDEFINED unless `drawn`. `drawn` is false while an end point is being dragged.
 
+**Drawing order.** On each side, lines are drawn from the shot outwards (`INNER_NEIGHBOURS` / `OUTER_NEIGHBOURS` in `pick_chart.py`). `PickChart.can_draw()` allows a head wave only once its inner neighbour is `complete` (or when it already has a line, so saved interpretations that break the order still load). `set_active_tool` refuses other drawers, and `MainWindow` disables their radio buttons. Conversely, a line can't be removed while its outer neighbour exists (`_must_keep_line`). A first right-click still erases one end point so it can be placed again, but the second right-click (on the now pending line) is refused with `lineRemovalRefused`. Deselecting the drawer restores the line from `LineDrawer.last_line`, and `get_draw_points()` packs `last_line` in the meantime.
+
 ### State and signals
 
 The Java version chained JavaFX property listeners. This port recomputes from state instead:
@@ -73,7 +75,8 @@ The Java version chained JavaFX property listeners. This port recomputes from st
 
 `_ToolViewBox` turns off pyqtgraph's pan, zoom and context menu and forwards clicks and drags to `PickChart`:
 - A drag that starts within `GRAB_RADIUS` px of a complete line's end point moves that point, whatever tool is active.
-- Otherwise the event goes to the active tool: drawer clicks, or the zoom / eraser rubber band.
+- Otherwise a left button event goes to the active tool: drawer clicks, or the zoom / eraser rubber band.
+- A right-click (`_right_click`) works whatever the active tool. If the active line is `pending` (one point placed, the other missing), it removes that line's remaining point, wherever the mouse is. Otherwise it erases the end point nearest to the mouse (in pixels, no radius) among all complete lines, and makes that line the active tool so a left-click places the point again.
 - Hover (`scene().sigMouseMoved`) drives the preview lines and the cursor.
 
 Everything is in data coordinates (offset m, time ms). Two gotchas:

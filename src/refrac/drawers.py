@@ -7,7 +7,6 @@ state and pyqtgraph items; PickChart decides which drawer receives the mouse eve
 from collections.abc import Callable
 
 import pyqtgraph as pg
-from PySide6.QtCore import Qt
 
 from refrac.geometry import line_coefficients, line_intersection
 from refrac.structs import UNDEFINED, Point
@@ -39,6 +38,8 @@ class LineDrawer:
         self.drawn = False
         self.enabled = False
         self._on_change = on_change
+        # End points the line last had while complete, to restore it after an end point is erased
+        self.last_line: tuple[Point, Point] | None = None
 
         self._line = pg.PlotCurveItem(pen=pg.mkPen(color, width=2))
         # Hollow end point symbols
@@ -64,6 +65,11 @@ class LineDrawer:
     def complete(self) -> bool:
         return self.p1 is not None and self.p2 is not None
 
+    @property
+    def pending(self) -> bool:
+        """Whether the line has one point placed and the other still to place."""
+        return self.p1 is not None and self.p2 is None
+
     def _coefficients(self) -> tuple[float, float]:
         if not self.drawn:
             return UNDEFINED, UNDEFINED
@@ -76,6 +82,10 @@ class LineDrawer:
         self._hide_previews()
         self._refresh()
 
+    def restore_line(self) -> None:
+        """Completes the line again with its last complete end points."""
+        self.set_points(*self.last_line)
+
     def clear(self) -> None:
         self.enabled = False
         self.p1 = self.p2 = None
@@ -86,9 +96,20 @@ class LineDrawer:
     def set_enabled(self, enabled: bool) -> None:
         raise NotImplementedError
 
-    def click(self, pos: Point, button: Qt.MouseButton) -> None:
-        """Handles a click on the chart while this drawer is enabled."""
+    def click(self, pos: Point) -> None:
+        """Handles a left click on the chart while this drawer is enabled."""
         raise NotImplementedError
+
+    def erase_end_point(self, index: int, cursor: Point) -> None:
+        """Erases an end point of the complete line, index 0 for p1 and 1 for p2, to place it
+        again from the other one."""
+        raise NotImplementedError
+
+    def discard_point(self) -> None:
+        """Removes the point left on a pending line, and so the line."""
+        self.p1 = None
+        self._hide_previews()
+        self._refresh()
 
     def hover(self, pos: Point) -> None:
         if self._preview.isVisible():
@@ -114,8 +135,12 @@ class LineDrawer:
 
     def _refresh(self) -> None:
         if self.complete:
+            self.last_line = (self.p1, self.p2)
             _set_segment(self._line, self.p1, self.p2)
         else:
+            if self.p1 is None:
+                # The line was removed
+                self.last_line = None
             self._line.setData([], [])
         points = self._visible_end_points()
         self._end_points.setData(x=[p[0] for p in points], y=[p[1] for p in points])
@@ -159,8 +184,8 @@ class StandardLineDrawer(LineDrawer):
                 self.p1 = None
         self._refresh()
 
-    def click(self, pos: Point, button: Qt.MouseButton) -> None:
-        if button == Qt.MouseButton.LeftButton and not self.drawn:
+    def click(self, pos: Point) -> None:
+        if not self.drawn:
             if self.p1 is None:
                 self.p1 = pos
                 self._show_preview(self.p1, pos)
@@ -168,17 +193,15 @@ class StandardLineDrawer(LineDrawer):
                 self.p2 = pos
                 self._hide_previews()
                 self.drawn = True
-        elif button == Qt.MouseButton.RightButton and self.p1 is not None:
-            if self.p2 is None:
-                self.p1 = None
-                self._hide_previews()
-            else:
-                # Erase the end point nearest to the click, then draw it again from the other one
-                if abs(pos[0] - self.p1[0]) < abs(pos[0] - self.p2[0]):
-                    self.p1, self.p2 = self.p2, self.p1
-                self.p2 = None
-                self.drawn = False
-                self._show_preview(self.p1, pos)
+        self._refresh()
+
+    def erase_end_point(self, index: int, cursor: Point) -> None:
+        if index == 0:
+            # The erased point is always p2
+            self.p1, self.p2 = self.p2, self.p1
+        self.p2 = None
+        self.drawn = False
+        self._show_preview(self.p1, cursor)
         self._refresh()
 
     def draggable_points(self) -> list[tuple[int, Point]]:
@@ -218,7 +241,6 @@ class OriginFixedLineDrawer(LineDrawer):
         self.enabled = enabled
         if enabled:
             if not self.drawn:
-                self.p1 = ORIGIN
                 self._show_previews(ORIGIN)
         else:
             self._hide_previews()
@@ -226,16 +248,24 @@ class OriginFixedLineDrawer(LineDrawer):
                 self.p1 = None
         self._refresh()
 
-    def click(self, pos: Point, button: Qt.MouseButton) -> None:
-        if button == Qt.MouseButton.LeftButton and not self.drawn:
+    def click(self, pos: Point) -> None:
+        if not self.drawn:
             self.p1 = ORIGIN
             self.p2 = pos
             self._hide_previews()
             self.drawn = True
-        elif button == Qt.MouseButton.RightButton and self.drawn:
-            self.p2 = None
-            self.drawn = False
-            self._show_previews(pos)
+        self._refresh()
+
+    def erase_end_point(self, index: int, cursor: Point) -> None:
+        # Only p2 is free, and p1 stays at the origin, so the line is pending
+        self.p2 = None
+        self.drawn = False
+        self._show_previews(cursor)
+        self._refresh()
+
+    def discard_point(self) -> None:
+        # The origin previews stay while enabled, as for an empty line
+        self.p1 = None
         self._refresh()
 
     def hover(self, pos: Point) -> None:
