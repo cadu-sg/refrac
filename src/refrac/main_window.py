@@ -138,8 +138,10 @@ class MainWindow(QMainWindow):
         self._add_action(toolbar, "Apply", self._on_apply_shots_loaded)
         toolbar.addSeparator()
 
-        self._tool_buttons[ZOOM] = self._add_action(toolbar, "Zoom", checkable=True)
-        self._tool_buttons[ERASER] = self._add_action(toolbar, "Erase picks", checkable=True)
+        self._tool_buttons[ZOOM] = self._add_action(
+            toolbar, "Zoom", shortcut=QKeySequence(Qt.Key.Key_Z), checkable=True)
+        self._tool_buttons[ERASER] = self._add_action(
+            toolbar, "Erase picks", shortcut=QKeySequence(Qt.Key.Key_E), checkable=True)
 
     def _build_sidebar(self) -> QWidget:
         content = QWidget()

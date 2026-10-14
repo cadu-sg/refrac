@@ -649,3 +649,15 @@ def test_shot_keyboard_shortcuts(window, qtbot):
     window.pick_chart.set_draw_points(draw_points_on_picks(window.main_shot))
     QTest.keyClick(window, Qt.Key.Key_S)
     assert window.line.load_draw_points(MIDDLE_SHOT - 1) != [UNDEFINED_POINT] * 14
+
+
+def test_tool_keyboard_shortcuts(window, qtbot):
+    window.show()
+    window.activateWindow()
+    qtbot.waitUntil(window.isActiveWindow, timeout=2000)
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Z)
+    assert window.pick_chart.active_tool == ZOOM
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_E)
+    assert window.pick_chart.active_tool == ERASER
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_E)
+    assert window.pick_chart.active_tool is None
