@@ -10,11 +10,12 @@ from refrac.structs import UNDEFINED, Point, Shot, ShotMetadata, Station
 
 SURFACE_COLOR = "#F3622D"
 SOURCE_COLOR = "#FF9800"
-# Colors of layers 1 to 3, from the slowest to the fastest velocity of each layer
+# Colors of layers 1 to 4, from the slowest to the fastest velocity of each layer
 LAYER_COLORMAPS = tuple(pg.ColorMap(None, [pg.mkColor(color) for color in colors]) for colors in (
     ("#FDD0A2", "#FD8D3C", "#A63603"),
     ("#C7E9C0", "#74C476", "#006D2C"),
     ("#C6DBEF", "#6BAED6", "#08519C"),
+    ("#DADAEB", "#9E9AC8", "#54278F"),
 ))
 # A layer's colormap spans at least this fraction of its mean velocity, so that small velocity
 # differences don't stretch over the whole colormap
@@ -31,14 +32,15 @@ class LayerChart(QWidget):
 
     Clicking the chart emits shotClicked with the index of the shot nearest to the click.
 
-    Below a shot, layer n spans from its interface n point up to the point above it, and is
-    colored from its velocity: each layer has its own hue, from light for the slowest velocity of
-    the layer along the line to dark for the fastest. Each interface point takes the color of the
-    layer above it, and the layers 1 to 3 are filled with a gradient between the shots.
+    Below a shot, layer n spans from its interface n point up to the point above it, and the
+    deepest layer, below the shot's last interface, reaches down to the bottom of the chart. Each
+    layer is colored from its velocity: each layer has its own hue, from light for the slowest
+    velocity of the layer along the line to dark for the fastest. Each interface point takes the
+    color of the layer above it, and the layers are filled with a gradient between the shots.
 
     Hovering the chart shows the velocity of a layer below one shot: the shot nearest to the
-    mouse along x, and the layer the mouse is in (the deepest interface stands for the layers
-    below it). A thin segment spans the layer, from its interface point up to the point above.
+    mouse along x, and the layer the mouse is in. A thin segment spans the layer, from its
+    interface point (or the bottom of the chart) up to the point above.
 
     The y axis spans from the bottom elevation, DEFAULT_DEPTH below the lowest station (floored to the metre) unless
     set_bottom changes it, up to the highest station or source. The x axis autoranges.
@@ -69,7 +71,7 @@ class LayerChart(QWidget):
         plot_item.plot(self._surface_x, self._surface_elev,
                        pen=pg.mkPen(SURFACE_COLOR, width=2), name="Surface")
         self._interfaces = []
-        for number, colormap in enumerate(LAYER_COLORMAPS, start=1):
+        for number, colormap in enumerate(LAYER_COLORMAPS[:3], start=1):
             dark, middle = colormap.map(1.0, mode="qcolor"), colormap.map(0.5, mode="qcolor")
             interface = plot_item.plot([], [], pen=pg.mkPen(dark, width=2), symbol="o",
                                        symbolSize=7, symbolPen=pg.mkPen(dark, width=1),
@@ -98,7 +100,7 @@ class LayerChart(QWidget):
 
         # (x, interface 1 elevation, interface 2 elevation, interface 3 elevation) by station
         self.interface_points: dict[int, tuple[float, float, float, float]] = {}
-        # (station elevation, (h1, h2, h3), (v1, v2, v3)) by station
+        # (station elevation, (h1, h2, h3), (v1, v2, v3, v4)) by station
         self._layers: dict[int, tuple[float, tuple[float, ...], tuple[float, ...]]] = {}
 
         self._shots_sou_x = np.array([shot.sou_x for shot in shots_metadata], dtype=float)
@@ -116,13 +118,17 @@ class LayerChart(QWidget):
         margin = TOP_MARGIN * (self.top - elevation)
         self._plot_widget.getPlotItem().getViewBox().setYRange(elevation, self.top + margin,
                                                                padding=0)
+        # The deepest layers reach down to the bottom
+        self._refresh_fills()
+        if self._hover_pos is not None:
+            self.show_velocity_at(*self._hover_pos)
 
     def plot_layer_thickness(self, thicknesses: list[float], velocities: list[float],
                              station: Station) -> None:
         """Plots the interfaces below the station from the thicknesses of the three layers, or
         removes them if the first thickness is UNDEFINED. An interface whose layer thickness is
-        UNDEFINED is left out, so its line joins the stations around. The velocities of the three
-        layers are shown on hover."""
+        UNDEFINED is left out, so its line joins the stations around. The velocities of the four
+        layers color them and are shown on hover."""
         h1, h2, h3 = thicknesses
         if h1 == UNDEFINED:
             self.interface_points.pop(station.num, None)
@@ -135,7 +141,10 @@ class LayerChart(QWidget):
             self._layers[station.num] = (station.elev, (h1, h2, h3), tuple(velocities))
         for number, interface in enumerate(self._interfaces, start=1):
             colors = self._layer_colors(number)
-            interface.setData(*self._interface_line(number), symbolBrush=list(colors.values()))
+            middle = LAYER_COLORMAPS[number - 1].map(0.5, mode="qcolor")
+            interface.setData(*self._interface_line(number),
+                              symbolBrush=[colors.get(num, middle)
+                                           for num in self._interface_stations(number)])
         self._refresh_fills()
         if self._hover_pos is not None:
             self.show_velocity_at(*self._hover_pos)
@@ -148,25 +157,27 @@ class LayerChart(QWidget):
         self._source.setData(x=[shot.sou_x], y=[shot.sou_elev])
 
     def velocity_target(self, x: float, y: float) -> tuple[int, int] | None:
-        """The station and the interface (1 to 3) whose velocity is shown for the mouse at (x, y),
+        """The station and the layer (1 to 4) whose velocity is shown for the mouse at (x, y),
         or None if no interface is plotted.
 
-        The interface is the first one below y, or the deepest one if y is below them all. The
-        station is the one nearest to x among those with a layer above that interface, falling
-        back to the interface above if there are none.
+        The layer is the one below the interface lines above y, those drawn at x (or at the
+        nearest end of interface 1 if x is beyond it). The station is the one nearest to x among
+        those with that layer, falling back to the layer above if there are none.
         """
         if not self._layers:
             return None
+        xs, _ = self._interface_line(1)
+        x_drawn = min(max(x, xs[0]), xs[-1])
         above = 0
         for interface in (1, 2, 3):
             xs, elevations = self._interface_line(interface)
-            if xs.size and np.interp(x, xs, elevations) > y:
+            if xs.size and xs[0] <= x_drawn <= xs[-1] and np.interp(x_drawn, xs, elevations) > y:
                 above += 1
-        for interface in range(min(above + 1, 3), 0, -1):
-            candidates = self._interface_stations(interface)
+        for layer in range(above + 1, 0, -1):
+            candidates = self._layer_stations(layer)
             if candidates:
                 station = min(candidates, key=lambda num: abs(self.interface_points[num][0] - x))
-                return station, interface
+                return station, layer
         return None
 
     def show_velocity_at(self, x: float, y: float) -> None:
@@ -175,11 +186,13 @@ class LayerChart(QWidget):
         if target is None:
             self._hide_velocity()
             return
-        station, interface = target
+        station, layer = target
         station_x = self.interface_points[station][0]
-        bottom = self.interface_points[station][interface]
-        top = self._layer_top(station, interface)
-        velocity = self._layers[station][2][interface - 1]
+        top = self._layer_top(station, layer)
+        bottom = (self.interface_points[station][layer]
+                  if layer <= 3 and self._layers[station][1][layer - 1] != UNDEFINED
+                  else self.bottom)
+        velocity = self._layers[station][2][layer - 1]
 
         self._hover_segment.setData([station_x, station_x], [top, bottom])
         (x_min, x_max), _ = self._plot_widget.getPlotItem().getViewBox().viewRange()
@@ -202,13 +215,21 @@ class LayerChart(QWidget):
         return (np.array([point[0] for point in points], dtype=float),
                 np.array([point[interface] for point in points], dtype=float))
 
+    def _layer_stations(self, layer: int) -> list[int]:
+        """The stations below which the layer (1 to 4) is, with a velocity, sorted by x."""
+        stations = (sorted(self._layers, key=lambda num: self.interface_points[num][0])
+                    if layer == 1 else self._interface_stations(layer - 1))
+        return [num for num in stations
+                if self._layers[num][2][layer - 1] != UNDEFINED
+                and np.isfinite(self._layers[num][2][layer - 1])]
+
     def _layer_top(self, station: int, layer: int) -> float:
-        """Elevation of the top of the layer (1 to 3) below the station."""
+        """Elevation of the top of the layer (1 to 4) below the station."""
         return self._layers[station][0] if layer == 1 else self.interface_points[station][layer - 1]
 
     def _layer_colors(self, layer: int) -> dict[int, QColor]:
-        """Color of the layer (1 to 3) below each station with that layer, sorted by x."""
-        stations = self._interface_stations(layer)
+        """Color of the layer (1 to 4) below each station with that layer, sorted by x."""
+        stations = self._layer_stations(layer)
         if not stations:
             return {}
         velocities = np.array([self._layers[num][2][layer - 1] for num in stations], dtype=float)
@@ -219,36 +240,56 @@ class LayerChart(QWidget):
         return dict(zip(stations, LAYER_COLORMAPS[layer - 1].map(positions, mode="qcolor")))
 
     def _refresh_fills(self) -> None:
-        """Fills the layers 1 to 3 between each pair of neighbouring stations with that layer,
-        with a gradient from the color of the layer below one station to the other's."""
+        """Fills the layers between each pair of neighbouring stations with that layer, with a
+        gradient from the color of the layer below one station to the other's. A layer between
+        two interfaces is filled between the stations with its interface, and the deepest layer
+        from the last interface down to the bottom of the chart."""
         plot_item = self._plot_widget.getPlotItem()
         for fill in self._fills:
             plot_item.removeItem(fill)
         self._fills = []
         for layer in (1, 2, 3):
             colors = self._layer_colors(layer)
-            stations = list(colors)
+            stations = [num for num in self._interface_stations(layer) if num in colors]
             top_xs, top_elevations = ((self._surface_x, self._surface_elev) if layer == 1
                                       else self._interface_line(layer - 1))
             for a, b in zip(stations, stations[1:]):
                 x_a, x_b = self.interface_points[a][0], self.interface_points[b][0]
                 between = (top_xs > x_a) & (top_xs < x_b)
-                outline = [(x_a, self._layer_top(a, layer)),
-                           *zip(top_xs[between], top_elevations[between]),
-                           (x_b, self._layer_top(b, layer)),
-                           (x_b, self.interface_points[b][layer]),
-                           (x_a, self.interface_points[a][layer])]
-                gradient = QLinearGradient(x_a, 0, x_b, 0)
-                for position, station in ((0, a), (1, b)):
-                    color = QColor(colors[station])
-                    color.setAlpha(FILL_ALPHA)
-                    gradient.setColorAt(position, color)
-                fill = QGraphicsPolygonItem(QPolygonF([QPointF(x, y) for x, y in outline]))
-                fill.setBrush(QBrush(gradient))
-                fill.setPen(QPen(Qt.PenStyle.NoPen))
-                plot_item.addItem(fill, ignoreBounds=True)
-                fill.setZValue(-1)
-                self._fills.append(fill)
+                self._add_fill([(x_a, self._layer_top(a, layer)),
+                                *zip(top_xs[between], top_elevations[between]),
+                                (x_b, self._layer_top(b, layer)),
+                                (x_b, self.interface_points[b][layer]),
+                                (x_a, self.interface_points[a][layer])],
+                               x_a, x_b, colors[a], colors[b])
+        for interface in (1, 2, 3):
+            colors = self._layer_colors(interface + 1)
+            stations = self._interface_stations(interface)
+            below = set(self._interface_stations(interface + 1)) if interface < 3 else set()
+            for a, b in zip(stations, stations[1:]):
+                # Unless the next interface spans the pair, the layer below reaches the bottom
+                if {a, b} <= below or a not in colors or b not in colors:
+                    continue
+                x_a, x_b = self.interface_points[a][0], self.interface_points[b][0]
+                self._add_fill([(x_a, self.interface_points[a][interface]),
+                                (x_b, self.interface_points[b][interface]),
+                                (x_b, self.bottom), (x_a, self.bottom)],
+                               x_a, x_b, colors[a], colors[b])
+
+    def _add_fill(self, outline: list[Point], x_a: float, x_b: float, color_a: QColor,
+                  color_b: QColor) -> None:
+        """Fills the polygon with a gradient along x, from color_a at x_a to color_b at x_b."""
+        gradient = QLinearGradient(x_a, 0, x_b, 0)
+        for position, color in ((0, color_a), (1, color_b)):
+            color = QColor(color)
+            color.setAlpha(FILL_ALPHA)
+            gradient.setColorAt(position, color)
+        fill = QGraphicsPolygonItem(QPolygonF([QPointF(x, y) for x, y in outline]))
+        fill.setBrush(QBrush(gradient))
+        fill.setPen(QPen(Qt.PenStyle.NoPen))
+        self._plot_widget.getPlotItem().addItem(fill, ignoreBounds=True)
+        fill.setZValue(-1)
+        self._fills.append(fill)
 
     def _hide_velocity(self) -> None:
         self._hover_segment.hide()
