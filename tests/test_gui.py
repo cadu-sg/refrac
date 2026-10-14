@@ -180,6 +180,8 @@ def test_go_to_shot_and_layer_chart_navigation(window):
 
     window.layer_chart.shotClicked.emit(3)
     assert window._source_station_label.text() == "131"
+    source_line = window.layer_chart._source_line
+    assert source_line.isVisible() and source_line.value() == window.main_shot.sou_x
 
 
 def test_single_active_tool(window):
