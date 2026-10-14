@@ -10,6 +10,7 @@ from refrac.structs import UNDEFINED, Point, Shot, ShotMetadata, Station
 
 SURFACE_COLOR = "#F3622D"
 SOURCE_COLOR = "#FF9800"
+SOURCE_LINE_COLOR = "#9E9E9E"
 # Colors of layers 1 to 4, from the slowest to the fastest velocity of each layer
 LAYER_COLORMAPS = tuple(pg.ColorMap(None, [pg.mkColor(color) for color in colors]) for colors in (
     ("#FDD0A2", "#FD8D3C", "#A63603"),
@@ -84,6 +85,11 @@ class LayerChart(QWidget):
         self._source = pg.ScatterPlotItem(symbol="d", size=15, pen=None, brush=SOURCE_COLOR)
         plot_item.addItem(self._receivers)
         plot_item.addItem(self._source)
+        # Vertical line through the source, hidden until a shot is plotted
+        self._source_line = pg.InfiniteLine(
+            angle=90, pen=pg.mkPen(SOURCE_LINE_COLOR, width=1, style=Qt.PenStyle.DashLine))
+        self._source_line.hide()
+        plot_item.addItem(self._source_line, ignoreBounds=True)
 
         foreground = pg.getConfigOption("foreground")
         label_fill = pg.mkColor(pg.getConfigOption("background"))
@@ -150,11 +156,14 @@ class LayerChart(QWidget):
             self.show_velocity_at(*self._hover_pos)
 
     def plot_shot_in_surface(self, shot: Shot) -> None:
-        """Marks the receivers and the source of the shot on the surface."""
+        """Marks the receivers and the source of the shot on the surface, and the x of the source
+        with a vertical line."""
         receivers = [self._stations[num] for num in {pick.rec_stat for pick in shot.picks}
                      if num in self._stations]
         self._receivers.setData(x=[s.x for s in receivers], y=[s.elev for s in receivers])
         self._source.setData(x=[shot.sou_x], y=[shot.sou_elev])
+        self._source_line.setValue(shot.sou_x)
+        self._source_line.show()
 
     def velocity_target(self, x: float, y: float) -> tuple[int, int] | None:
         """The station and the layer (1 to 4) whose velocity is shown for the mouse at (x, y),
