@@ -333,7 +333,7 @@ class MainWindow(QMainWindow):
             thicknesses = interpretation[2:5]
             if (thicknesses[0] != UNDEFINED
                     and not any(math.isnan(thickness) for thickness in thicknesses)):
-                self.layer_chart.plot_layer_thickness(thicknesses, interpretation[5:8],
+                self.layer_chart.plot_layer_thickness(thicknesses, interpretation[5:9],
                                                       metadata.station())
 
     # Shots
@@ -440,7 +440,7 @@ class MainWindow(QMainWindow):
                 self._show_error("Cannot compute layer thickness",
                                  "There is an incoherent interpretation")
             else:
-                self.layer_chart.plot_layer_thickness(thicknesses, velocities[:3],
+                self.layer_chart.plot_layer_thickness(thicknesses, velocities,
                                                       self.main_shot.station())
 
             self.line.save_interpretation(

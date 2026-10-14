@@ -233,21 +233,22 @@ def test_layer_chart_shows_the_velocity_of_the_layer_under_the_mouse(window):
     window.pick_chart.set_draw_points(draw_points_on_picks(window.main_shot))
     window.pick_chart.fit_all()
     window.save_plot()
-    velocities = window.line.load_all_interpretations()[MIDDLE_SHOT][5:8]
+    velocities = window.line.load_all_interpretations()[MIDDLE_SHOT][5:9]
     layer_chart = window.layer_chart
     x, elevation1, elevation2, elevation3 = layer_chart.interface_points[221]
-    tops = [window.main_shot.sou_elev, elevation1, elevation2]
-    bottoms = [elevation1, elevation2, elevation3]
-    for y, interface in [(elevation1 + 1, 1), ((elevation1 + elevation2) / 2, 2),
-                         ((elevation2 + elevation3) / 2, 3), (elevation3 - 50, 3)]:
+    # The deepest layer reaches down to the bottom of the chart
+    tops = [window.main_shot.sou_elev, elevation1, elevation2, elevation3]
+    bottoms = [elevation1, elevation2, elevation3, layer_chart.bottom]
+    for y, layer in [(elevation1 + 1, 1), ((elevation1 + elevation2) / 2, 2),
+                     ((elevation2 + elevation3) / 2, 3), (elevation3 - 50, 4)]:
         # Only x matters within a layer, and station 221 is the only one interpreted
-        assert layer_chart.velocity_target(x + 1000, y) == (221, interface)
+        assert layer_chart.velocity_target(x + 1000, y) == (221, layer)
         layer_chart.show_velocity_at(x + 1000, y)
         assert layer_chart._hover_segment.isVisible() and layer_chart._hover_text.isVisible()
         segment_x, segment_y = layer_chart._hover_segment.getData()
         assert list(segment_x) == [x, x]
-        assert list(segment_y) == [tops[interface - 1], bottoms[interface - 1]]
-        assert hover_velocity_text(layer_chart) == f"{velocities[interface - 1]:.0f} m/s"
+        assert list(segment_y) == [tops[layer - 1], bottoms[layer - 1]]
+        assert hover_velocity_text(layer_chart) == f"{velocities[layer - 1]:.0f} m/s"
 
     layer_chart._on_mouse_moved(QPointF(-1e6, -1e6))  # outside the plot
     assert not layer_chart._hover_segment.isVisible()
@@ -272,20 +273,20 @@ def test_layer_colors_follow_the_velocities_of_each_layer(qtbot):
     qtbot.addWidget(layer_chart)
     middle = LAYER_COLORMAPS[0].map(0.5, mode="qcolor").lightnessF()
 
-    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [600.0, 2000.0, 0.0], stations[0])
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [600.0, 2000.0, 0.0, 0.0], stations[0])
     assert point_lightnesses(layer_chart, 1) == pytest.approx([middle])
 
     # Faster is darker
-    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [500.0, 2000.0, 0.0], stations[1])
-    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [700.0, 2000.0, 0.0], stations[2])
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [500.0, 2000.0, 0.0, 0.0], stations[1])
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [700.0, 2000.0, 0.0, 0.0], stations[2])
     lightness600, lightness500, lightness700 = point_lightnesses(layer_chart, 1)
     assert lightness500 > lightness600 > lightness700
     assert lightness600 == pytest.approx(middle)
 
     # A velocity difference much smaller than the velocities keeps close to the middle
     for station in stations[1:3]:
-        layer_chart.plot_layer_thickness([UNDEFINED] * 3, [UNDEFINED] * 3, station)
-    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [601.0, 2000.0, 0.0], stations[3])
+        layer_chart.plot_layer_thickness([UNDEFINED] * 3, [UNDEFINED] * 4, station)
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [601.0, 2000.0, 0.0, 0.0], stations[3])
     assert point_lightnesses(layer_chart, 1) == pytest.approx([middle] * 2, abs=0.02)
 
 
@@ -301,7 +302,7 @@ def test_layer_chart_bottom_defaults_below_the_lowest_station_and_can_be_set(qtb
 
     layer_chart.set_bottom(-50.0)
     # A deeper interface doesn't move the bottom
-    layer_chart.plot_layer_thickness([500.0, 0.0, 0.0], [600.0, 0.0, 0.0], stations[0])
+    layer_chart.plot_layer_thickness([500.0, 0.0, 0.0], [600.0, 0.0, 0.0, 0.0], stations[0])
     assert layer_chart.bottom == view_bottom(layer_chart) == pytest.approx(-50)
 
 
@@ -329,46 +330,87 @@ def point_colors(layer_chart: LayerChart, layer: int) -> list[int]:
     return [brush.color().rgb() for brush in brushes]
 
 
+def fills_by_outline(layer_chart: LayerChart) -> dict:
+    return {tuple(fill_outline(fill)): fill for fill in layer_chart._fills}
+
+
+def colormap_ends(layer: int) -> list[int]:
+    return [LAYER_COLORMAPS[layer - 1].map(position, mode="qcolor").rgb() for position in (0, 1)]
+
+
 def test_layers_are_filled_with_a_gradient_between_the_stations(qtbot):
     stations = [Station(1, 0.0, 0.0, 100.0), Station(2, 50.0, 0.0, 110.0),
                 Station(3, 100.0, 0.0, 100.0), Station(4, 200.0, 0.0, 100.0)]
     layer_chart = LayerChart(stations, [])
     qtbot.addWidget(layer_chart)
-    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [500.0, 2000.0, 0.0], stations[0])
+    layer_chart.set_bottom(-100.0)
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [500.0, 2000.0, 0.0, 0.0], stations[0])
     assert layer_chart._fills == []
 
-    # Layer 1 only, as interface 2 is at a single station. Its top follows the surface.
-    layer_chart.plot_layer_thickness([10.0, 20.0, 0.0], [600.0, 2000.0, 3000.0], stations[2])
-    (layer1,) = layer_chart._fills
-    assert fill_outline(layer1) == [(0, 100), (50, 110), (100, 100), (100, 90), (0, 90)]
-    assert fill_colors(layer1) == point_colors(layer_chart, 1)
+    # Layer 1, whose top follows the surface, and below it layer 2 down to the bottom, as
+    # interface 2 is at a single station
+    layer_chart.plot_layer_thickness([10.0, 20.0, 0.0], [600.0, 2000.0, 3000.0, 0.0],
+                                     stations[2])
+    fills = fills_by_outline(layer_chart)
+    layer1 = ((0, 100), (50, 110), (100, 100), (100, 90), (0, 90))
+    deep_layer2 = ((0, 90), (100, 90), (100, -100), (0, -100))
+    assert set(fills) == {layer1, deep_layer2}
+    assert fill_colors(fills[layer1]) == colormap_ends(1)
+    assert fill_colors(fills[deep_layer2]) == point_colors(layer_chart, 2) * 2
 
-    layer_chart.plot_layer_thickness([10.0, 30.0, 0.0], [600.0, 2500.0, 3000.0], stations[3])
-    assert len(layer_chart._fills) == 3  # two in layer 1, then one in layer 2
-    layer2 = layer_chart._fills[2]
-    assert fill_outline(layer2) == [(100, 90), (200, 90), (200, 60), (100, 70)]
-    assert fill_colors(layer2) == point_colors(layer_chart, 2)
+    # Below interface 2, layer 3 reaches down to the bottom
+    layer_chart.plot_layer_thickness([10.0, 30.0, 0.0], [600.0, 2500.0, 3000.0, 0.0],
+                                     stations[3])
+    layer2 = ((100, 90), (200, 90), (200, 60), (100, 70))
+    deep_layer3 = ((100, 70), (200, 60), (200, -100), (100, -100))
+    assert set(fills_by_outline(layer_chart)) == {
+        layer1, ((100, 100), (200, 100), (200, 90), (100, 90)), deep_layer2, layer2, deep_layer3}
+    assert fill_colors(fills_by_outline(layer_chart)[layer2]) == point_colors(layer_chart, 2)
+
+    # The deepest layers follow the bottom
+    layer_chart.set_bottom(-50.0)
+    assert ((100, 70), (200, 60), (200, -50), (100, -50)) in fills_by_outline(layer_chart)
+
+    # With interface 3 at both stations, layer 4 is below it instead
+    layer_chart.plot_layer_thickness([10.0, 20.0, 5.0], [600.0, 2000.0, 3000.0, 4000.0],
+                                     stations[2])
+    layer_chart.plot_layer_thickness([10.0, 30.0, 10.0], [600.0, 2500.0, 3000.0, 5000.0],
+                                     stations[3])
+    fills = fills_by_outline(layer_chart)
+    deep_layer4 = ((100, 65), (200, 50), (200, -50), (100, -50))
+    assert deep_layer4 in fills and ((100, 70), (200, 60), (200, -50), (100, -50)) not in fills
+    assert fill_colors(fills[deep_layer4]) == colormap_ends(4)
 
 
-def test_layer_chart_velocity_falls_back_to_the_interfaces_above(qtbot):
-    stations = [Station(1, 0.0, 0.0, 100.0), Station(2, 100.0, 0.0, 100.0)]
+def test_layer_chart_velocity_target(qtbot):
+    stations = [Station(1, 0.0, 0.0, 100.0), Station(2, 100.0, 0.0, 100.0),
+                Station(3, 200.0, 0.0, 100.0)]
     layer_chart = LayerChart(stations, [])
     qtbot.addWidget(layer_chart)
     assert layer_chart.velocity_target(0.0, 50.0) is None
 
-    # Below the only interface there is, layer 1 is shown
-    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [500.0, 2000.0, 0.0], stations[0])
-    assert layer_chart.velocity_target(0.0, 50.0) == (1, 1)
-
-    # Below interface 2, layer 2 is shown even under a station without it
-    layer_chart.plot_layer_thickness([10.0, 20.0, 0.0], [500.0, 2000.0, 3000.0], stations[1])
-    assert interface_lines(layer_chart) == [([0.0, 100.0], [90.0, 90.0]), ([100.0], [70.0]),
-                                            ([], [])]
-    assert layer_chart.velocity_target(0.0, 50.0) == (2, 2)
+    # Below the only interface there is, the deepest layer, layer 2
+    layer_chart.plot_layer_thickness([10.0, 0.0, 0.0], [500.0, 2000.0, 0.0, 0.0], stations[0])
     assert layer_chart.velocity_target(0.0, 95.0) == (1, 1)
+    assert layer_chart.velocity_target(0.0, 50.0) == (1, 2)
 
-    layer_chart.plot_layer_thickness([0.0] * 3, [0.0] * 3, stations[1])
-    assert layer_chart.velocity_target(100.0, 50.0) == (1, 1)
+    # Where interface 2 isn't drawn, below interface 1 is still layer 2
+    layer_chart.plot_layer_thickness([10.0, 20.0, 0.0], [500.0, 2000.0, 3000.0, 0.0],
+                                     stations[1])
+    layer_chart.plot_layer_thickness([10.0, 20.0, 0.0], [500.0, 2000.0, 3000.0, 0.0],
+                                     stations[2])
+    assert interface_lines(layer_chart) == [
+        ([0.0, 100.0, 200.0], [90.0, 90.0, 90.0]), ([100.0, 200.0], [70.0, 70.0]), ([], [])]
+    assert layer_chart.velocity_target(0.0, 50.0) == (1, 2)
+    assert layer_chart.velocity_target(40.0, 50.0) == (1, 2)
+    assert layer_chart.velocity_target(100.0, 80.0) == (2, 2)
+    assert layer_chart.velocity_target(100.0, 50.0) == (2, 3)
+    # Beyond the last station, as at the last station
+    assert layer_chart.velocity_target(500.0, 50.0) == (3, 3)
+
+    for station in stations:
+        layer_chart.plot_layer_thickness([0.0] * 3, [0.0] * 4, station)
+    assert layer_chart.velocity_target(0.0, 50.0) is None
 
 
 def test_interfaces_and_source_hang_from_the_sou_elev_column(window, tmp_path, sou_elev_picks):
