@@ -1,14 +1,15 @@
-"""Directory-based storage: a project is a directory of lines, a line a directory of four files.
+"""Directory-based storage: a project is a directory of lines, a line a directory of five files.
 
 | File                  | Class              | Role                                              |
 |-----------------------|--------------------|---------------------------------------------------|
 | `picks_origin.dat`    | PicksTxt           | Verbatim copy of the user's picks file            |
-| `picks.bin`           | PicksBin           | Random-access mirror of the picks, edited in place |
+| `picks.bin`           | PicksBin           | Random-access copy of every pick, written once    |
+| `picks_mask.bin`      | PicksMaskBin       | Which picks are kept or erased, edited in place   |
 | `draw_points.bin`     | DrawPointsBin      | The 14 line drawer points of each shot            |
 | `interpretations.csv` | InterpretationsCSV | 21 interpretation values per shot                 |
 
-Record N of `picks.bin`, block N of `draw_points.bin` and row N of `interpretations.csv` all
-describe the shot with index N. The binary files are big-endian.
+Record N of `picks.bin`, block N of `picks_mask.bin`, block N of `draw_points.bin` and row N of
+`interpretations.csv` all describe the shot with index N. The binary files are big-endian.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from refrac.structs import Pick, Point, Shot, ShotMetadata, Station
 
 PICKS_TXT_NAME = "picks_origin.dat"
 PICKS_BIN_NAME = "picks.bin"
+PICKS_MASK_BIN_NAME = "picks_mask.bin"
 DRAW_POINTS_BIN_NAME = "draw_points.bin"
 INTERPRETATIONS_CSV_NAME = "interpretations.csv"
 
@@ -182,7 +184,12 @@ class PicksTxt:
 
 class PicksBin:
     """Picks binary file: header `shotAmount (int) + shotPositions (long[])`, then for each shot a
-    24-byte header followed by 32 bytes per pick."""
+    24-byte header followed by 32 bytes per pick.
+
+    It holds every pick of the picks file and is only written when the line is created: erased
+    picks are marked in PicksMaskBin instead. Lines made by refrac 1.x dropped them from this
+    file, rewriting the shot in place, smaller (see _convert_legacy_picks).
+    """
 
     def __init__(self, path: Path, shot_positions: Sequence[int]):
         self.path = path
@@ -224,12 +231,6 @@ class PicksBin:
                 raise ValueError(f"Cannot load shot {shot_index + 1}: invalid {self.path.name}") from e
         return Shot(seq_num, sou_stat, sou_x, sou_y, sou_elev, picks)
 
-    def save_shot(self, shot: Shot, shot_index: int) -> None:
-        """Overwrites the shot in place, so it must not have more picks than when created."""
-        with open(self.path, "r+b") as file:
-            file.seek(self._position(shot_index))
-            file.write(_shot_to_bytes(shot))
-
     def _position(self, shot_index: int) -> int:
         if not 0 <= shot_index < len(self.shot_positions):
             raise IndexError(f"Shot index out of range: {shot_index}")
@@ -243,6 +244,107 @@ def _shot_to_bytes(shot: Shot) -> bytes:
         _PICK.pack(pick.rec_stat, pick.travel_time, pick.rec_x, pick.rec_y, pick.rec_elev,
                    pick.offset, pick.cdp, pick.wave_type)
         for pick in shot.picks)
+
+
+class PicksMaskBin:
+    """Picks mask binary file: header `shotAmount (int)`, then for each shot a block of one byte
+    per pick, in the order of picks.bin: 1 for a pick kept, 0 for one erased. The size of each
+    block is the shot's pick amount in the picks file."""
+
+    def __init__(self, path: Path, pick_amounts: Sequence[int]):
+        self.path = path
+        self.pick_amounts = list(pick_amounts)
+        self._offsets = np.concatenate(([0], np.cumsum(self.pick_amounts)))
+
+    @classmethod
+    def create(cls, path: Path, masks: Sequence[np.ndarray]) -> PicksMaskBin:
+        with open(path, "wb") as file:
+            file.write(_INT.pack(len(masks)))
+            if masks:
+                file.write(np.concatenate(masks).astype(np.uint8).tobytes())
+        return cls(path, [len(mask) for mask in masks])
+
+    @classmethod
+    def open(cls, path: Path, pick_amounts: Sequence[int]) -> PicksMaskBin:
+        try:
+            with open(path, "rb") as file:
+                (shot_amount,) = _INT.unpack(file.read(_INT.size))
+        except FileNotFoundError as e:
+            raise ValueError(f"Cannot read {path.name}: no such file") from e
+        except struct.error as e:
+            raise ValueError(f"Cannot read {path.name}: invalid file") from e
+        if (shot_amount != len(pick_amounts)
+                or path.stat().st_size != _INT.size + sum(pick_amounts)):
+            raise ValueError(f"Cannot open {path.name}: invalid file")
+        return cls(path, pick_amounts)
+
+    def save(self, mask: np.ndarray, shot_index: int) -> None:
+        position = self._position(shot_index)
+        if len(mask) != self.pick_amounts[shot_index]:
+            raise ValueError("Cannot save picks mask: illegal number of picks")
+        with open(self.path, "r+b") as file:
+            file.seek(position)
+            file.write(np.asarray(mask, dtype=np.uint8).tobytes())
+
+    def load(self, shot_index: int) -> np.ndarray:
+        position = self._position(shot_index)
+        with open(self.path, "rb") as file:
+            file.seek(position)
+            data = file.read(self.pick_amounts[shot_index])
+        return np.frombuffer(data, dtype=np.uint8) != 0
+
+    def _position(self, shot_index: int) -> int:
+        if not 0 <= shot_index < len(self.pick_amounts):
+            raise IndexError(f"Shot index out of range: {shot_index}")
+        return _INT.size + int(self._offsets[shot_index])
+
+
+def _kept_mask(original: Sequence[Pick], kept: Sequence[Pick]) -> np.ndarray:
+    """The mask of the original picks that are kept, the kept picks being some of them in the
+    same order. They are matched by receiver station, which avoids comparing floats."""
+    mask = np.zeros(len(original), dtype=bool)
+    remaining = iter(enumerate(original))
+    for pick in kept:
+        for index, candidate in remaining:
+            if candidate.rec_stat == pick.rec_stat:
+                mask[index] = True
+                break
+        else:
+            raise ValueError("not a subset of the picks file")
+    return mask
+
+
+def _convert_legacy_picks(home_dir: Path, picks_txt: PicksTxt,
+                          picks_bin: PicksBin) -> tuple[PicksBin, PicksMaskBin]:
+    """Converts a line made by refrac 1.x, which has no picks_mask.bin and whose picks.bin may
+    have shots that lost their erased picks. picks.bin gets every pick of the picks file again,
+    and picks_mask.bin marks the lost ones erased.
+
+    The mask is written last, so a conversion that is interrupted runs again at the next open.
+    """
+    picks_bin_path = home_dir / PICKS_BIN_NAME
+    if len(picks_bin.shot_positions) != picks_txt.shot_amount:
+        raise ValueError(f"Cannot convert {picks_bin_path.name}: it doesn't have the "
+                         f"{picks_txt.shot_amount} shots of {PICKS_TXT_NAME}")
+    masks = []
+    for shot_index, shot in enumerate(picks_txt.shots):
+        try:
+            masks.append(_kept_mask(shot.picks, picks_bin.load_shot(shot_index).picks))
+        except ValueError as e:
+            raise ValueError(f"Cannot convert {picks_bin_path.name}: shot {shot_index + 1} "
+                             f"doesn't match {PICKS_TXT_NAME}") from e
+
+    if not all(mask.all() for mask in masks):
+        temporary = picks_bin_path.with_name(picks_bin_path.name + ".tmp")
+        PicksBin.create(temporary, picks_txt.shots)
+        temporary.replace(picks_bin_path)
+        picks_bin = PicksBin.open(picks_bin_path)
+
+    mask_path = home_dir / PICKS_MASK_BIN_NAME
+    temporary = mask_path.with_name(mask_path.name + ".tmp")
+    PicksMaskBin.create(temporary, masks)
+    temporary.replace(mask_path)
+    return picks_bin, PicksMaskBin.open(mask_path, [len(mask) for mask in masks])
 
 
 class DrawPointsBin:
@@ -358,10 +460,12 @@ class Line:
     """A seismic line: a directory holding its picks, drawings and interpretations."""
 
     def __init__(self, home_dir: Path, picks_txt: PicksTxt, picks_bin: PicksBin,
-                 draw_points_bin: DrawPointsBin, interpretations_csv: InterpretationsCSV):
+                 picks_mask_bin: PicksMaskBin, draw_points_bin: DrawPointsBin,
+                 interpretations_csv: InterpretationsCSV):
         self.home_dir = home_dir
         self._picks_txt = picks_txt
         self._picks_bin = picks_bin
+        self._picks_mask_bin = picks_mask_bin
         self._draw_points_bin = draw_points_bin
         self._interpretations_csv = interpretations_csv
 
@@ -399,6 +503,8 @@ class Line:
             home_dir,
             picks_txt,
             PicksBin.create(home_dir / PICKS_BIN_NAME, picks_txt.shots),
+            PicksMaskBin.create(home_dir / PICKS_MASK_BIN_NAME,
+                                [np.ones(len(shot.picks), dtype=bool) for shot in picks_txt.shots]),
             DrawPointsBin.create(home_dir / DRAW_POINTS_BIN_NAME, picks_txt.shot_amount),
             InterpretationsCSV.create(home_dir / INTERPRETATIONS_CSV_NAME,
                                       [shot.sou_stat for shot in picks_txt.shots]))
@@ -406,18 +512,30 @@ class Line:
     @classmethod
     def open(cls, home_dir: Path) -> Line:
         picks_txt = PicksTxt.open(home_dir / PICKS_TXT_NAME)
+        picks_bin = PicksBin.open(home_dir / PICKS_BIN_NAME)
+        if (home_dir / PICKS_MASK_BIN_NAME).exists():
+            picks_mask_bin = PicksMaskBin.open(
+                home_dir / PICKS_MASK_BIN_NAME,
+                [metadata.pick_amount for metadata in picks_txt.shots_metadata])
+        else:
+            picks_bin, picks_mask_bin = _convert_legacy_picks(home_dir, picks_txt, picks_bin)
         return cls(
             home_dir,
             picks_txt,
-            PicksBin.open(home_dir / PICKS_BIN_NAME),
+            picks_bin,
+            picks_mask_bin,
             DrawPointsBin.open(home_dir / DRAW_POINTS_BIN_NAME),
             InterpretationsCSV(home_dir / INTERPRETATIONS_CSV_NAME, picks_txt.shot_amount))
 
     def load_shot(self, shot_index: int) -> Shot:
         return self._picks_bin.load_shot(shot_index)
 
-    def save_shot(self, shot: Shot, shot_index: int) -> None:
-        self._picks_bin.save_shot(shot, shot_index)
+    def load_picks_mask(self, shot_index: int) -> np.ndarray:
+        """Which picks of the shot are kept (True) or erased (False), in the order of its picks."""
+        return self._picks_mask_bin.load(shot_index)
+
+    def save_picks_mask(self, mask: np.ndarray, shot_index: int) -> None:
+        self._picks_mask_bin.save(mask, shot_index)
 
     def load_draw_points(self, shot_index: int) -> list[Point]:
         return self._draw_points_bin.load(shot_index)

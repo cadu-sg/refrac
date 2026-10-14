@@ -4,6 +4,7 @@ import math
 from functools import partial
 from pathlib import Path
 
+import numpy as np
 from PySide6.QtCore import QSignalBlocker, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QColorDialog, QDoubleSpinBox, QFileDialog, QFormLayout, QGridLayout,
@@ -35,9 +36,12 @@ class MainWindow(QMainWindow):
         self.amount_loaded_shots = 1
         self.main_shot: Shot | None = None
         self.loaded_shots: list[Shot] = []
+        # Which picks of each loaded shot are kept, as saved
+        self.loaded_masks: list[np.ndarray] = []
         self._main_position = 0  # index of the main shot in loaded_shots
-        # Draw points as last saved or loaded, to detect unsaved changes
+        # Draw points and main shot mask as last saved or loaded, to detect unsaved changes
         self.last_saved_draw_points: list[Point] | None = None
+        self.last_saved_mask: np.ndarray | None = None
 
         # Tools of the pick chart, at most one checked: zoom, eraser and the eight line drawers
         self._tool_buttons: dict[str, QAction | QRadioButton] = {}
@@ -65,6 +69,7 @@ class MainWindow(QMainWindow):
 
         self._on_layout_changed()
         self._on_drawings_changed()
+        self._on_erased_picks_changed()
         self._update_state()
 
     # UI construction
@@ -101,6 +106,20 @@ class MainWindow(QMainWindow):
             self._line_menu, "&Export Interpretation...", self._on_export_interpretation)
         self._line_menu.addSeparator()
         self._add_action(self._line_menu, "&Close", lambda: self.set_line(None))
+
+        # Also on the toolbar, next to the eraser
+        edit_menu = menu_bar.addMenu("&Edit")
+        self._undo_action = self._add_action(edit_menu, "&Undo", self._on_undo_picks,
+                                             QKeySequence.StandardKey.Undo)
+        self._undo_action.setToolTip("Undo the last erasing or restoring of picks")
+        self._redo_action = self._add_action(edit_menu, "&Redo", self._on_redo_picks,
+                                             QKeySequence.StandardKey.Redo)
+        self._redo_action.setToolTip("Redo the last erasing or restoring of picks undone")
+        edit_menu.addSeparator()
+        self._restore_action = self._add_action(edit_menu, "Restore &Original Picks",
+                                                self._on_restore_picks)
+        self._restore_action.setIconText("Restore picks")
+        self._restore_action.setToolTip("Bring back the erased picks of the current shot")
 
     def _build_toolbar(self) -> None:
         toolbar = self._toolbar = self.addToolBar("Shot")
@@ -142,6 +161,8 @@ class MainWindow(QMainWindow):
             toolbar, "Zoom", shortcut=QKeySequence(Qt.Key.Key_Z), checkable=True)
         self._tool_buttons[ERASER] = self._add_action(
             toolbar, "Erase picks", shortcut=QKeySequence(Qt.Key.Key_E), checkable=True)
+        for action in (self._undo_action, self._redo_action, self._restore_action):
+            toolbar.addAction(action)
 
     def _build_sidebar(self) -> QWidget:
         content = QWidget()
@@ -289,6 +310,7 @@ class MainWindow(QMainWindow):
         self.pick_chart.activeToolChanged.connect(self._sync_tool_buttons)
         self.pick_chart.zoomedChanged.connect(self._zoom_hint.setVisible)
         self.pick_chart.lineRemovalRefused.connect(self._on_line_removal_refused)
+        self.pick_chart.erasedPicksChanged.connect(self._on_erased_picks_changed)
 
         self.layer_chart = LayerChart(line.stations, line.shots_metadata)
         self.layer_chart.shotClicked.connect(self.try_change_shot)
@@ -322,12 +344,15 @@ class MainWindow(QMainWindow):
         self.layer_chart = None
         self.main_shot = None
         self.loaded_shots = []
+        self.loaded_masks = []
         self.last_saved_draw_points = None
+        self.last_saved_mask = None
         for label in (self._seq_num_label, self._source_station_label, self._coordinates_label):
             label.clear()
         self._sync_tool_buttons(None)
         self._zoom_hint.hide()
         self._on_drawings_changed()
+        self._on_erased_picks_changed()
 
     def _load_layer_thicknesses(self) -> None:
         for metadata, interpretation in zip(self.line.shots_metadata,
@@ -348,10 +373,14 @@ class MainWindow(QMainWindow):
         self._update_plot()
 
     def _resolve_unsaved_changes(self) -> bool:
-        """Asks to save the drawings if they changed, and saves them if so answered. False if the
-        user cancels."""
-        if self._draw_points_unchanged():
+        """Asks to save the drawings and erased picks if they changed, and saves them if so
+        answered. False if the user cancels."""
+        if self._draw_points_unchanged() and self._picks_unchanged():
             return True
+        return self._ask_and_save()
+
+    def _ask_and_save(self) -> bool:
+        """Asks to save the changes, and saves them if so answered. False if the user cancels."""
         answer = self._ask_save_changes()
         if answer == QMessageBox.StandardButton.Save:
             self.save_plot()
@@ -362,6 +391,9 @@ class MainWindow(QMainWindow):
         if self.last_saved_draw_points is None:
             return not any(map(is_point_defined, draw_points))
         return draw_points == self.last_saved_draw_points
+
+    def _picks_unchanged(self) -> bool:
+        return np.array_equal(self.pick_chart.main_mask(), self.last_saved_mask)
 
     def _ask_save_changes(self) -> QMessageBox.StandardButton:
         box = QMessageBox(QMessageBox.Icon.Question, "Unsaved changes",
@@ -399,8 +431,10 @@ class MainWindow(QMainWindow):
         first = max(0, index - half)
         last = min(self.line.shot_amount - 1, index + half)
         self.loaded_shots = [self.line.load_shot(i) for i in range(first, last + 1)]
+        self.loaded_masks = [self.line.load_picks_mask(i) for i in range(first, last + 1)]
         self._main_position = index - first
         self.main_shot = self.loaded_shots[self._main_position]
+        self.last_saved_mask = self.loaded_masks[self._main_position]
 
         if amount == 1:
             self._seq_num_label.setText(str(index + 1))
@@ -414,7 +448,7 @@ class MainWindow(QMainWindow):
         self._shots_loaded_spin.setValue(amount)
 
     def _plot_loaded_shots(self) -> None:
-        self.pick_chart.plot(self.loaded_shots, self._main_position)
+        self.pick_chart.plot(self.loaded_shots, self.loaded_masks, self._main_position)
         self.layer_chart.plot_shot_in_surface(self.main_shot)
 
     def _first_previous_draw_points(self) -> list[Point] | None:
@@ -431,7 +465,9 @@ class MainWindow(QMainWindow):
         index = self.main_shot_index
         chart = self.pick_chart
         try:
-            self.line.save_shot(chart.get_main_shot(), index)
+            mask = chart.main_mask()
+            self.line.save_picks_mask(mask, index)
+            self.last_saved_mask = mask
 
             self.last_saved_draw_points = chart.get_draw_points()
             self.line.save_draw_points(self.last_saved_draw_points, index)
@@ -538,8 +574,10 @@ class MainWindow(QMainWindow):
             # An odd amount keeps the main shot centred
             amount += 1
         if amount != self.amount_loaded_shots:
-            self.amount_loaded_shots = amount
-            self._update_plot_except_line_drawers()
+            # Reloading the shots discards the erased picks not saved, but keeps the drawings
+            if self._picks_unchanged() or self._ask_and_save():
+                self.amount_loaded_shots = amount
+                self._update_plot_except_line_drawers()
         self._shots_loaded_spin.setValue(self.amount_loaded_shots)
 
     def _pick_style(self) -> PickStyle:
@@ -594,6 +632,24 @@ class MainWindow(QMainWindow):
             left_label.setText(_velocity_text(velocity(slopes[left])))
             right_label.setText(_velocity_text(velocity(slopes[right])))
             average_label.setText(_velocity_text(average_velocity(slopes[left], slopes[right])))
+
+    def _on_erased_picks_changed(self) -> None:
+        chart = self.pick_chart
+        self._undo_action.setEnabled(chart is not None and chart.can_undo_picks)
+        self._redo_action.setEnabled(chart is not None and chart.can_redo_picks)
+        self._restore_action.setEnabled(chart is not None and chart.can_restore_main_picks)
+
+    def _on_undo_picks(self) -> None:
+        if self.pick_chart is not None:
+            self.pick_chart.undo_picks()
+
+    def _on_redo_picks(self) -> None:
+        if self.pick_chart is not None:
+            self.pick_chart.redo_picks()
+
+    def _on_restore_picks(self) -> None:
+        if self.pick_chart is not None:
+            self.pick_chart.restore_main_picks()
 
     def _on_fit(self, name: str) -> None:
         self.pick_chart.fit(name)

@@ -4,6 +4,7 @@ import math
 import numpy as np
 import pytest
 from PySide6.QtCore import QEvent, QPointF, Qt
+from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
@@ -31,6 +32,8 @@ def window(qtbot, tmp_path, synthetic_picks):
     window._show_error = lambda header, content: window.errors.append((header, content))
     window.warnings = []
     window._show_warning = lambda header, content: window.warnings.append((header, content))
+    # The modal prompt would block, tests that expect it answer it
+    window._ask_save_changes = lambda: pytest.fail("Unexpected prompt to save changes")
     project = Project.create(tmp_path / "project")
     window.set_project(project)
     window.set_line(project.create_line("line", synthetic_picks))
@@ -146,15 +149,164 @@ def test_export_without_interpreted_shots_writes_nothing(window, monkeypatch):
     assert len(messages) == 1 and messages[0].startswith("No interpreted shots")
 
 
-def test_erased_picks_are_saved(window):
-    picks_before = len(window.main_shot.picks)
+def erased_offsets(window) -> list[float]:
+    """Offsets of the erased picks of the main shot."""
+    mask = window.pick_chart.main_mask()
+    return [pick.offset for pick, kept in zip(window.main_shot.picks, mask) if not kept]
+
+
+ERASED_100_TO_200 = list(range(100, 201, 5))  # the first shot's offsets from 100 to 200 m
+
+
+def test_erased_picks_are_saved_and_can_be_restored(window):
+    picks = window.main_shot.picks
     window.pick_chart.erase_picks(100, 200, 0, 1000)
     window.save_plot()
     window.try_change_shot(1)
     window.try_change_shot(0)
-    picks = window.main_shot.picks
-    assert len(picks) == picks_before - 21  # offsets 100 to 200, every 5 m
-    assert all(not 100 <= pick.offset <= 200 for pick in picks)
+
+    # The erased picks stay in picks.bin, marked erased in the mask
+    assert window.main_shot.picks == picks
+    mask = window.line.load_picks_mask(0)
+    assert [pick.offset for pick, kept in zip(picks, mask) if not kept] == ERASED_100_TO_200
+    assert erased_offsets(window) == ERASED_100_TO_200
+    assert not window.pick_chart.can_undo_picks
+
+    window._restore_action.trigger()
+    assert erased_offsets(window) == []
+    assert not window._restore_action.isEnabled()
+    window.save_plot()
+    assert window.line.load_picks_mask(0).all()
+
+
+def test_undo_and_redo_erased_picks(window, qtbot):
+    chart = window.pick_chart
+    assert not chart.can_undo_picks and not chart.can_redo_picks
+    with qtbot.waitSignal(chart.erasedPicksChanged):
+        chart.erase_picks(100, 150, 0, 1000)
+    chart.erase_picks(140, 200, 0, 1000)  # overlapping the first
+    assert erased_offsets(window) == ERASED_100_TO_200
+    # Erasing no picks is no erasure to undo
+    chart.erase_picks(1000, 2000, 0, 1000)
+
+    # Undoing the second erasure brings back only the picks it erased
+    chart.undo_picks()
+    assert erased_offsets(window) == list(range(100, 151, 5))
+    chart.undo_picks()
+    assert erased_offsets(window) == []
+    assert not chart.can_undo_picks and chart.can_redo_picks
+    chart.undo_picks()  # nothing left to undo
+
+    chart.redo_picks()
+    assert erased_offsets(window) == list(range(100, 151, 5))
+    # A new erasure drops the erasures undone
+    chart.erase_picks(300, 400, 0, 1000)
+    assert chart.can_undo_picks and not chart.can_redo_picks
+
+    # Plotting other shots starts another history
+    window._ask_save_changes = lambda: QMessageBox.StandardButton.Discard
+    window.try_change_shot(1)
+    assert not chart.can_undo_picks and not chart.can_redo_picks
+    assert erased_offsets(window) == []
+
+
+def test_restore_brings_back_the_main_shot_picks_only(window):
+    window.try_change_shot(MIDDLE_SHOT)
+    window._shots_loaded_spin.setValue(3)
+    window._on_apply_shots_loaded()
+    chart = window.pick_chart
+    assert not chart.can_restore_main_picks
+
+    chart.erase_picks(-1e6, 1e6, -1e6, 1e6)  # every pick of the three shots
+    assert not chart._alive.any()
+    window._restore_action.trigger()
+    assert chart.main_mask().all()
+    assert chart._alive.sum() == len(window.main_shot.picks)  # the others stay erased
+
+    # Restoring can be undone
+    window._undo_action.trigger()
+    assert not chart._alive.any()
+    window._redo_action.trigger()
+    assert chart.main_mask().all()
+
+
+def test_pick_edit_actions_follow_the_history(window):
+    actions = (window._undo_action, window._redo_action, window._restore_action)
+    enabled = lambda: [action.isEnabled() for action in actions]
+    assert enabled() == [False, False, False]
+    window.pick_chart.erase_picks(100, 200, 0, 1000)
+    assert enabled() == [True, False, True]
+    window._undo_action.trigger()
+    assert enabled() == [False, True, False]
+    window._redo_action.trigger()
+    assert enabled() == [True, False, True]
+    window._restore_action.trigger()
+    assert enabled() == [True, False, False]
+    window.set_line(None)
+    assert enabled() == [False, False, False]
+
+
+@pytest.mark.parametrize("answer, expected_shot, saved", [
+    (QMessageBox.StandardButton.Cancel, 0, False),
+    (QMessageBox.StandardButton.Discard, 1, False),
+    (QMessageBox.StandardButton.Save, 1, True),
+])
+def test_unsaved_erased_picks_prompt(window, answer, expected_shot, saved):
+    window.pick_chart.erase_picks(100, 200, 0, 1000)
+    window._ask_save_changes = lambda: answer
+    window.try_change_shot(1)
+    assert window.main_shot_index == expected_shot
+    assert (not window.line.load_picks_mask(0).all()) == saved
+    if expected_shot == 0:
+        assert erased_offsets(window) == ERASED_100_TO_200
+
+
+def test_erased_picks_compare_with_the_saved_ones(window):
+    chart = window.pick_chart
+    asked = []
+    window._ask_save_changes = lambda: asked.append(True) or QMessageBox.StandardButton.Discard
+    # Erasing then undoing changes nothing
+    chart.erase_picks(100, 200, 0, 1000)
+    chart.undo_picks()
+    window.try_change_shot(1)
+    assert asked == [] and window.main_shot_index == 1
+
+    # But undoing a saved erasure does
+    chart.erase_picks(100, 200, 0, 1000)
+    window.save_plot()
+    chart.undo_picks()
+    window.try_change_shot(2)
+    assert asked == [True]
+
+
+@pytest.mark.parametrize("answer, amount", [
+    (QMessageBox.StandardButton.Cancel, 1),
+    (QMessageBox.StandardButton.Discard, 3),
+])
+def test_shots_loaded_asks_to_save_erased_picks(window, answer, amount):
+    window.try_change_shot(MIDDLE_SHOT)
+    chart = window.pick_chart
+    points = draw_points_on_picks(window.main_shot)
+    chart.set_draw_points(points)
+    chart.erase_picks(100, 200, 0, 1000)
+    asked = []
+    window._ask_save_changes = lambda: asked.append(True) or answer
+    window._shots_loaded_spin.setValue(3)
+    window._on_apply_shots_loaded()
+    assert asked == [True]
+    assert window.amount_loaded_shots == amount and window._shots_loaded_spin.value() == amount
+    # Discarding brings back the erased picks from picks_mask.bin, and keeps the drawings
+    assert chart.main_mask().all() == (answer == QMessageBox.StandardButton.Discard)
+    assert chart.get_draw_points() == points
+
+
+def test_shots_loaded_keeps_unsaved_drawings_without_asking(window):
+    points = draw_points_on_picks(window.main_shot)
+    window.pick_chart.set_draw_points(points)
+    window._shots_loaded_spin.setValue(3)
+    window._on_apply_shots_loaded()
+    assert window.amount_loaded_shots == 3
+    assert window.pick_chart.get_draw_points() == points
 
 
 def test_shots_loaded_window(window):
@@ -164,7 +316,7 @@ def test_shots_loaded_window(window):
     assert window.amount_loaded_shots == 5
     assert window._seq_num_label.text() == "11 to 15"
     assert window._source_station_label.text() == "201 to 241"
-    assert window.pick_chart.get_main_shot().sou_stat == 221
+    assert window.main_shot.sou_stat == 221
 
     # Clamped at the start of the line
     window.try_change_shot(0)
@@ -661,3 +813,16 @@ def test_tool_keyboard_shortcuts(window, qtbot):
     assert window.pick_chart.active_tool == ERASER
     QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_E)
     assert window.pick_chart.active_tool is None
+
+
+def test_undo_keyboard_shortcuts(window, qtbot):
+    window.show()
+    window.activateWindow()
+    qtbot.waitUntil(window.isActiveWindow, timeout=2000)
+    chart = window.pick_chart
+    chart.erase_picks(100, 200, 0, 1000)
+    QTest.keySequence(QApplication.focusWidget(), QKeySequence(QKeySequence.StandardKey.Undo))
+    assert erased_offsets(window) == []
+    assert chart.active_tool is None  # not the zoom of Z
+    QTest.keySequence(QApplication.focusWidget(), QKeySequence(QKeySequence.StandardKey.Redo))
+    assert erased_offsets(window) == ERASED_100_TO_200

@@ -26,20 +26,23 @@ uv run pytest tests/test_gui.py::test_shots_loaded_window   # a single test
 
 All code is in `src/refrac/`.
 
-### Storage (`storage.py`): Project → Line → four files
+### Storage (`storage.py`): Project → Line → five files
 
-Everything on disk is directory-based. A `Project` is just a directory. Each `Line` is a subdirectory of it containing exactly four files, all created together by `Line.create()` and reopened together by `Line.open()`:
+Everything on disk is directory-based. A `Project` is just a directory. Each `Line` is a subdirectory of it containing exactly five files, all created together by `Line.create()` and reopened together by `Line.open()`:
 
 | File | Class | Role |
 |---|---|---|
 | `picks_origin.dat` | `PicksTxt` | Verbatim copy of the user's picks file. UTF-8 (a byte order mark is skipped), 11 columns delimited by whitespace or semicolons, with a decimal point or decimal comma detected per file, plus an optional `SOU_ELEV` (without it, a source takes the elevation of the receiver station with its station number). The first line is a header naming the columns, which may come in any order. The column spec is in the `PicksTxt` docstring. Parsed at open to derive the shots, their metadata and the station list. |
-| `picks.bin` | `PicksBin` | Random-access mirror of the picks. Header = `shotAmount` (int) + `shotPositions` (long[]); each shot = 24-byte header + 32 bytes per pick. The app reads and writes shots here, and erased picks are persisted here. A shot is rewritten in place, so it can only shrink. |
+| `picks.bin` | `PicksBin` | Random-access copy of every pick. Header = `shotAmount` (int) + `shotPositions` (long[]); each shot = 24-byte header + 32 bytes per pick. Written once by `Line.create()`, never rewritten: erasing marks picks in the mask instead of dropping them. |
+| `picks_mask.bin` | `PicksMaskBin` | Which picks are kept. Header = `shotAmount` (int), then one byte per pick (1 kept, 0 erased), each shot's block sized by its pick amount in `picks_origin.dat`. Saving rewrites one shot's block in place. |
 | `draw_points.bin` | `DrawPointsBin` | Header = `shotAmount` (int), then a fixed block of 14 points (two doubles each) per shot. |
 | `interpretations.csv` | `InterpretationsCSV` | 21 columns per shot (thicknesses, velocities, intercepts, intersection x values). Rewritten in full on every save, by loading all rows, replacing one and writing all. |
 
 The binary files are **big-endian**, and the float fields of picks are float32. The CSV uses CRLF line endings and writes non-finite values as `NaN`, `Infinity` and `-Infinity`.
 
-**`shotIndex` is the shared key.** Record *N* in `picks.bin`, block *N* in `draw_points.bin` and row *N* in `interpretations.csv` all describe the same shot. Anything that changes shot ordering or count invalidates all three.
+**`shotIndex` is the shared key.** Record *N* in `picks.bin`, block *N* in `picks_mask.bin`, block *N* in `draw_points.bin` and row *N* in `interpretations.csv` all describe the same shot. Anything that changes shot ordering or count invalidates all four.
+
+**Lines from refrac 1.x** have no `picks_mask.bin`, and saving a shot with erased picks rewrote it smaller in `picks.bin`. `Line.open()` converts them (`_convert_legacy_picks`): it rebuilds `picks.bin` from `picks_origin.dat` and marks the missing picks erased, matching the kept picks in order by receiver station. The mask is written last, so its presence means the line is converted.
 
 ### The eight line drawers
 
@@ -83,6 +86,8 @@ Everything is in data coordinates (offset m, time ms). Two gotchas:
 - Scatter items must be `PassiveScatter` (from `drawers.py`). A plain `ScatterPlotItem` accepts left clicks on its points, so a click on a pick would never reach the ViewBox.
 - pyqtgraph drops mouse moves less than 10 ms apart (`mouseRateLimit`). Tests that synthesise mouse events need `QTest.qWait` between moves.
 
+**Erased picks.** `PickChart._alive` flags every plotted pick, loaded from the masks passed to `plot()`. Erasing and `restore_main_picks()` (the main shot only) are undoable: `_undo` / `_redo` hold `(flat pick indices, alive value set)` pairs, which `plot()` clears, and every change emits `erasedPicksChanged` for the Edit actions.
+
 The pick chart manages its range explicitly; it doesn't autorange. `reset_view()` fits the alive picks plus the origin. A zoom persists across shots until Esc calls `reset_zoom()`.
 
 ### `UNDEFINED = 0`
@@ -97,7 +102,7 @@ Chart axes are offset in metres (x) and travel time in **milliseconds** (y), so 
 
 `set_project()` / `set_line()` load and unload. Each line load builds a **fresh** `PickChart` and `LayerChart`; they are never reused, and `_unload_line()` deletes them.
 
-Shot changes all go through `try_change_shot()`. It compares the current draw points against `last_saved_draw_points` and asks Save / Don't save / Cancel before discarding. `_update_plot()` seeds the drawers with the nearest interpretation saved at or before the main shot (`_first_previous_draw_points`). If there is none, the drawers keep whatever they had.
+Shot changes all go through `try_change_shot()`. It compares the current draw points against `last_saved_draw_points`, and the main shot's mask (`PickChart.main_mask()`) against `last_saved_mask`, and asks Save / Don't save / Cancel before discarding. Changing "Shots loaded" reloads the picks but keeps the drawers, so it asks only when the mask changed. `_update_plot()` seeds the drawers with the nearest interpretation saved at or before the main shot (`_first_previous_draw_points`). If there is none, the drawers keep whatever they had.
 
 `LayerChart` doubles as a navigation control: clicking it emits `shotClicked` with the shot whose `sou_x` is nearest. Hovering it shows the velocity of one layer as a thin segment with a label. The layer is the one the mouse is in, judged against the interface lines drawn at the mouse x, and the shot is the nearest one along x that has that layer. Layer *n* lies below interface *n−1* and carries v*n* (layer 1 being the direct wave), passed to `plot_layer_thickness` from `interpretations.csv` columns v1–v4. The deepest layer below a shot (v4 below interface 3, v3 below interface 2 where there's no interface 3, and so on) reaches down to the bottom of the chart. Those velocities also color the chart (`LAYER_COLORMAPS`): one hue per layer, light to dark over that layer's velocity range along the line. Each interface point takes the color of the layer above it, and every layer, the deepest one down to the bottom, is filled with a horizontal gradient between neighbouring shots. An interface only goes through the shots whose thickness for that layer is defined. The y axis doesn't autorange: it spans from a bottom elevation (`LayerChart.set_bottom`, set from the Layout box, defaulting to the lowest station elevation, floored to the metre, minus `DEFAULT_DEPTH` = 1000 m) up to the highest station or source. The x axis autoranges.
 
