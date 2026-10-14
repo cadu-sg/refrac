@@ -123,9 +123,13 @@ class PickChart(QWidget):
 
     On each side, lines are drawn from the shot outwards: a head wave can only be drawn once the
     line inside it is, and a line can't be removed while the line outside it is drawn.
+
+    Erasing picks and restoring those of the main shot can be undone and redone, until other
+    shots are plotted.
     """
 
     drawingsChanged = Signal()
+    erasedPicksChanged = Signal()  # picks erased, restored, or plotted anew
     activeToolChanged = Signal(object)  # tool name, or None
     zoomedChanged = Signal(bool)
     lineRemovalRefused = Signal(str, str)  # the drawer whose line was kept, its outer neighbour
@@ -149,13 +153,17 @@ class PickChart(QWidget):
         layout.addWidget(self._plot_widget)
 
         # Picks of the loaded shots, flattened. owner is the index in _shots of each pick's shot,
-        # and alive is False for the picks erased with the eraser
+        # and alive is False for the erased picks
         self._shots: list[Shot] = []
         self._main = 0
         self._x = np.empty(0)
         self._y = np.empty(0)
         self._owner = np.empty(0, dtype=int)
         self._alive = np.empty(0, dtype=bool)
+        # Edits of the erased picks, as (flat indices of the picks changed, alive value set), the
+        # last one at the end
+        self._undo: list[tuple[np.ndarray, bool]] = []
+        self._redo: list[tuple[np.ndarray, bool]] = []
         self._style = PickStyle()
         self._pick_line = pg.PlotCurveItem()
         self._pick_symbols = PassiveScatter(symbol="o", pen=None)
@@ -204,24 +212,25 @@ class PickChart(QWidget):
 
     # Picks
 
-    def plot(self, shots: list[Shot], main_index: int) -> None:
-        """Plots the picks of the given shots, shots[main_index] being the one interpreted."""
+    def plot(self, shots: list[Shot], masks: list[np.ndarray], main_index: int) -> None:
+        """Plots the picks of the given shots, shots[main_index] being the one interpreted.
+        masks[i] tells which picks of shots[i] are kept (True) or erased (False)."""
         self._shots = shots
         self._main = main_index
         self._x = np.array([pick.offset for shot in shots for pick in shot.picks], dtype=float)
         self._y = np.array([pick.travel_time for shot in shots for pick in shot.picks], dtype=float)
         self._owner = np.repeat(np.arange(len(shots)), [len(shot.picks) for shot in shots])
-        self._alive = np.ones(len(self._x), dtype=bool)
+        self._alive = np.concatenate(masks, dtype=bool)  # a copy, the masks stay as given
+        self._undo.clear()
+        self._redo.clear()
         self._refresh_picks()
         if not self.zoomed:
             self.reset_view()
+        self.erasedPicksChanged.emit()
 
-    def get_main_shot(self) -> Shot:
-        """The main shot, without the picks erased with the eraser."""
-        main = self._shots[self._main]
-        alive = self._alive[self._owner == self._main]
-        return Shot(main.seq_num, main.sou_stat, main.sou_x, main.sou_y, main.sou_elev,
-                    [pick for pick, keep in zip(main.picks, alive) if keep])
+    def main_mask(self) -> np.ndarray:
+        """Which picks of the main shot are kept (True) or erased (False)."""
+        return self._alive[self._owner == self._main]
 
     def set_pick_style(self, style: PickStyle) -> None:
         self._style = style
@@ -230,10 +239,52 @@ class PickChart(QWidget):
     def erase_picks(self, x_min: float, x_max: float, y_min: float, y_max: float) -> None:
         """Erases the picks of all loaded shots inside the rectangle."""
         inside = (self._x >= x_min) & (self._x <= x_max) & (self._y >= y_min) & (self._y <= y_max)
-        self._alive &= ~inside
+        erased = np.flatnonzero(inside & self._alive)
+        if erased.size:
+            self._edit_picks(erased, False)
+
+    def restore_main_picks(self) -> None:
+        """Brings back the erased picks of the main shot."""
+        restored = np.flatnonzero((self._owner == self._main) & ~self._alive)
+        if restored.size:
+            self._edit_picks(restored, True)
+
+    @property
+    def can_restore_main_picks(self) -> bool:
+        return not self.main_mask().all()
+
+    @property
+    def can_undo_picks(self) -> bool:
+        return bool(self._undo)
+
+    @property
+    def can_redo_picks(self) -> bool:
+        return bool(self._redo)
+
+    def undo_picks(self) -> None:
+        """Undoes the last erasing or restoring of picks."""
+        if self._undo:
+            indices, alive = self._undo.pop()
+            self._redo.append((indices, alive))
+            self._set_alive(indices, not alive)
+
+    def redo_picks(self) -> None:
+        if self._redo:
+            indices, alive = self._redo.pop()
+            self._undo.append((indices, alive))
+            self._set_alive(indices, alive)
+
+    def _edit_picks(self, indices: np.ndarray, alive: bool) -> None:
+        self._undo.append((indices, alive))
+        self._redo.clear()
+        self._set_alive(indices, alive)
+
+    def _set_alive(self, indices: np.ndarray, alive: bool) -> None:
+        self._alive[indices] = alive
         self._refresh_picks()
         if not self.zoomed:
             self.reset_view()
+        self.erasedPicksChanged.emit()
 
     def _alive_picks(self) -> tuple[np.ndarray, np.ndarray]:
         return self._x[self._alive], self._y[self._alive]

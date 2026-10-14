@@ -1,9 +1,10 @@
 import math
 import struct
 
+import numpy as np
 import pytest
 
-from refrac.storage import DrawPointsBin, Line, PicksTxt, Project
+from refrac.storage import DrawPointsBin, Line, PicksBin, PicksTxt, Project, _shot_to_bytes
 from refrac.structs import UNDEFINED_POINT, Shot
 
 
@@ -44,15 +45,82 @@ def test_picks_bin_is_big_endian_with_shot_positions(line):
     assert struct.unpack_from(">iii", data, first_position) == (73, 1, 101)
 
 
-def test_save_shot_with_erased_picks(line):
+def test_picks_mask_starts_kept_and_round_trips(line):
+    data = (line.home_dir / "picks_mask.bin").read_bytes()
+    pick_amounts = [m.pick_amount for m in line.shots_metadata]
+    assert struct.unpack_from(">i", data) == (25,)
+    assert len(data) == 4 + sum(pick_amounts)
+    assert all(line.load_picks_mask(i).all() for i in range(25))
+
     shot = line.load_shot(5)
-    neighbour = line.load_shot(6)
-    line.save_shot(Shot(shot.seq_num, shot.sou_stat, shot.sou_x, shot.sou_y, shot.sou_elev,
-                        shot.picks[10:]), 5)
+    mask = line.load_picks_mask(5)
+    mask[:10] = False
+    line.save_picks_mask(mask, 5)
 
     reopened = Line.open(line.home_dir)
-    assert reopened.load_shot(5).picks == shot.picks[10:]
-    assert reopened.load_shot(6) == neighbour
+    assert reopened.load_picks_mask(5).tolist() == [False] * 10 + [True] * (len(mask) - 10)
+    assert reopened.load_picks_mask(4).all() and reopened.load_picks_mask(6).all()
+    # Erasing never removes picks
+    assert reopened.load_shot(5) == shot
+
+
+def test_picks_mask_rejects_another_number_of_picks(line):
+    with pytest.raises(ValueError, match="illegal number of picks"):
+        line.save_picks_mask(np.ones(5, dtype=bool), 0)
+    with pytest.raises(IndexError):
+        line.load_picks_mask(25)
+
+
+def test_picks_mask_bin_rejects_invalid_size(line):
+    path = line.home_dir / "picks_mask.bin"
+    path.write_bytes(path.read_bytes()[:-1])
+    with pytest.raises(ValueError, match="invalid file"):
+        Line.open(line.home_dir)
+
+
+def test_line_of_refrac_1_is_converted(line):
+    # refrac 1.x had no picks_mask.bin, and saving a shot dropped its erased picks from
+    # picks.bin, rewriting the shot in place
+    (line.home_dir / "picks_mask.bin").unlink()
+    shot = line.load_shot(5)
+    shrunk = Shot(shot.seq_num, shot.sou_stat, shot.sou_x, shot.sou_y, shot.sou_elev,
+                  shot.picks[:3] + shot.picks[10:])
+    picks_bin = PicksBin.open(line.home_dir / "picks.bin")
+    with open(picks_bin.path, "r+b") as file:
+        file.seek(picks_bin.shot_positions[5])
+        file.write(_shot_to_bytes(shrunk))
+
+    converted = Line.open(line.home_dir)
+    assert converted.load_shot(5) == shot
+    mask = converted.load_picks_mask(5).tolist()
+    assert mask == [True] * 3 + [False] * 7 + [True] * (len(shot.picks) - 10)
+    assert all(converted.load_picks_mask(i).all() for i in range(25) if i != 5)
+    assert (line.home_dir / "picks_mask.bin").exists()
+    assert not list(line.home_dir.glob("*.tmp"))
+
+    # Converted once
+    picks_bin_data = (line.home_dir / "picks.bin").read_bytes()
+    reopened = Line.open(line.home_dir)
+    assert reopened.load_picks_mask(5).tolist() == mask
+    assert (line.home_dir / "picks.bin").read_bytes() == picks_bin_data
+
+
+def test_line_of_refrac_1_without_erased_picks_keeps_its_picks_bin(line):
+    (line.home_dir / "picks_mask.bin").unlink()
+    picks_bin_data = (line.home_dir / "picks.bin").read_bytes()
+    converted = Line.open(line.home_dir)
+    assert all(converted.load_picks_mask(i).all() for i in range(25))
+    assert (line.home_dir / "picks.bin").read_bytes() == picks_bin_data
+
+
+def test_conversion_rejects_picks_bin_of_other_picks(line, synthetic_picks):
+    (line.home_dir / "picks_mask.bin").unlink()
+    shots = PicksTxt.open(synthetic_picks).shots
+    # Shot 5 with the picks of shot 6, whose receivers reach further
+    PicksBin.create(line.home_dir / "picks.bin", shots[:5] + [shots[6]] + shots[6:])
+    with pytest.raises(ValueError, match="shot 6 doesn't match picks_origin.dat"):
+        Line.open(line.home_dir)
+    assert not (line.home_dir / "picks_mask.bin").exists()
 
 
 def test_draw_points_start_undefined_and_round_trip(line):
@@ -307,7 +375,8 @@ def test_project_creates_and_opens_lines(tmp_path, synthetic_picks):
     line = project.create_line("L1", synthetic_picks)
     assert line.home_dir == tmp_path / "project" / "L1"
     assert sorted(path.name for path in line.home_dir.iterdir()) == [
-        "draw_points.bin", "interpretations.csv", "picks.bin", "picks_origin.dat"]
+        "draw_points.bin", "interpretations.csv", "picks.bin", "picks_mask.bin",
+        "picks_origin.dat"]
     assert project.open_line(line.home_dir).shot_amount == 25
 
 
