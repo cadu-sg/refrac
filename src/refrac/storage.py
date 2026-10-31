@@ -83,12 +83,13 @@ class PicksTxt:
 
     - FFID: shot sequential number
     - SOU_SLOC: source station number
-    - SRF_SLOC: receiver station number
+    - SRF_SLOC: receiver station number, or channel number within the shot
     - FB_PICK: travel time (ms)
     - SOU_X, SOU_Y: source coordinates
     - REC_X, REC_Y: receiver coordinates
-    - REC_ELEV: receiver station elevation
-    - OFFSET: signed source-receiver offset (m)
+    - REC_ELEV: receiver elevation
+    - OFFSET: signed source-receiver offset (m), negative for receivers at a smaller X than the
+      source
     - CDP: station nearest to the source-receiver midpoint
     - SOU_ELEV (optional): source elevation
 
@@ -96,16 +97,24 @@ class PicksTxt:
     thousands separators (detected from the data rows).
 
     The first line is a header naming the columns, exactly as above and each once, in any order.
-    Without a SOU_ELEV column, the source elevation is the elevation of the receiver station with
-    the source's station number.
 
     A shot is a run of consecutive rows with the same FFID.
+
+    Receivers are placed by their coordinates, not by SRF_SLOC, so the stations are the distinct
+    receiver positions whatever the numbering. Without a SOU_ELEV column, the source elevation is
+    the elevation of the receiver at the source position or, between receivers, of the two nearest
+    receivers weighted by inverse distance.
+
+    `warnings` reports what doesn't prevent reading the file but looks wrong: a receiver position
+    with more than one elevation, and offsets whose sign is mostly opposite to REC_X - SOU_X.
     """
 
-    def __init__(self, path: Path, shots: list[Shot], stations: list[Station]):
+    def __init__(self, path: Path, shots: list[Shot], stations: list[Station],
+                 warnings: Sequence[str] = ()):
         self.path = path
         self.shots = shots
         self.stations = stations
+        self.warnings = list(warnings)
         self.shots_metadata = [
             ShotMetadata(shot.seq_num, shot.sou_stat, shot.sou_x, shot.sou_y, shot.sou_elev,
                          len(shot.picks))
@@ -118,6 +127,7 @@ class PicksTxt:
     @classmethod
     def open(cls, path: Path) -> PicksTxt:
         rows = []
+        line_nums = []  # of the rows in the file, for the warnings
         try:
             # utf-8-sig drops the byte order mark that some exports, such as Excel's, start with
             with open(path, newline="", encoding="utf-8-sig") as file:
@@ -149,6 +159,7 @@ class PicksTxt:
                         _float32(row["REC_X"]), _float32(row["REC_Y"]),
                         _float32(row["REC_ELEV"]), _float32(row["OFFSET"]), int(row["CDP"]),
                         _float32(row[_SOU_ELEV_COLUMN]) if has_sou_elev else None))
+                    line_nums.append(reader.line_num)
                 except ValueError as e:
                     raise ValueError(
                         f"Cannot read picks file: invalid line {reader.line_num}: {e}") from e
@@ -161,25 +172,101 @@ class PicksTxt:
         if not rows:
             raise ValueError("Cannot read picks file: no picks found")
 
-        stations: dict[int, Station] = {}
-        for _, _, rec_stat, _, _, _, rec_x, rec_y, rec_elev, *_ in rows:
-            stations.setdefault(rec_stat, Station(rec_stat, rec_x, rec_y, rec_elev))
+        stations, elevation_warning = _receiver_stations(rows, line_nums)
+        positions = np.array([(station.x, station.y) for station in stations], dtype=float)
+        elevations = np.array([station.elev for station in stations], dtype=float)
 
         shots = []
         for _, shot_rows in groupby(rows, key=lambda row: row[0]):
             shot_rows = list(shot_rows)
             seq_num, sou_stat, _, _, sou_x, sou_y, *_, sou_elev = shot_rows[0]
             if sou_elev is None:
-                if sou_stat not in stations:
-                    raise ValueError(
-                        f"Unable to determine elevation for source station {sou_stat}")
-                sou_elev = stations[sou_stat].elev
+                sou_elev = _surface_elevation(sou_x, sou_y, positions, elevations)
             picks = [Pick(rec_stat, travel_time, rec_x, rec_y, rec_elev, offset, cdp)
                      for _, _, rec_stat, travel_time, _, _, rec_x, rec_y, rec_elev, offset, cdp, _
                      in shot_rows]
             shots.append(Shot(seq_num, sou_stat, sou_x, sou_y, sou_elev, picks))
 
-        return cls(path, shots, [stations[num] for num in sorted(stations)])
+        warnings = [warning for warning in (elevation_warning,
+                                            _offset_sign_warning(rows, line_nums)) if warning]
+        return cls(path, shots, stations, warnings)
+
+
+# Receivers closer than this (m) are at the same position
+_SAME_POSITION = 0.01
+
+
+def _receiver_stations(rows: Sequence[tuple], line_nums: Sequence[int],
+                       ) -> tuple[list[Station], str | None]:
+    """The stations of the line, one per receiver position sorted by x then y, and a warning if
+    rows at the same position disagree about its elevation.
+
+    They are keyed by position rather than SRF_SLOC, as some files number the channels of each
+    shot instead of the stations of the line. A station takes its number and elevation from the
+    first row at its position.
+    """
+    stations: dict[tuple[float, float], tuple[Station, int]] = {}  # with its first line
+    # (line, elevation) of the first row that disagrees, by position
+    conflicts: dict[tuple[float, float], tuple[int, float]] = {}
+    for (_, _, rec_stat, _, _, _, rec_x, rec_y, rec_elev, *_), line_num in zip(rows, line_nums):
+        key = (round(rec_x, 2), round(rec_y, 2))
+        station, _ = stations.setdefault(
+            key, (Station(rec_stat, rec_x, rec_y, rec_elev), line_num))
+        if rec_elev != station.elev:
+            conflicts.setdefault(key, (line_num, rec_elev))
+
+    warning = None
+    if conflicts:
+        key, (line_num, elevation) = next(iter(conflicts.items()))
+        station, first_line = stations[key]
+        warning = (f"REC_ELEV differs between rows with the same receiver position at "
+                   f"{len(conflicts)} of the {len(stations)} receiver positions, starting with "
+                   f"({station.x:.2f}, {station.y:.2f}): {station.elev:.2f} on line {first_line} "
+                   f"and {elevation:.2f} on line {line_num}. refrac uses the first elevation of "
+                   f"each position.")
+    return sorted((station for station, _ in stations.values()),
+                  key=lambda station: (station.x, station.y)), warning
+
+
+def _surface_elevation(x: float, y: float, positions: np.ndarray, elevations: np.ndarray,
+                       ) -> float:
+    """The elevation at (x, y), from the receivers at `positions` (n × 2) and their elevations:
+    the elevation of the receiver there, or else of the two nearest receivers weighted by inverse
+    distance. On a straight line that interpolates between the receivers around the point, and
+    past the last receiver it stays between the elevations of the last two, rather than
+    extrapolating."""
+    distances = np.hypot(*(positions - (x, y)).T)
+    nearest = np.argsort(distances, kind="stable")[:2]
+    if distances[nearest[0]] < _SAME_POSITION:
+        elevation = elevations[nearest[0]]
+    else:
+        weights = 1 / distances[nearest]
+        elevation = weights @ elevations[nearest] / weights.sum()
+    # Stored as float32 in picks.bin, so parsed shots match the shots loaded from it
+    return float(np.float32(elevation))
+
+
+def _offset_sign_warning(rows: Sequence[tuple], line_nums: Sequence[int]) -> str | None:
+    """A warning if most offsets have the opposite sign of REC_X - SOU_X, which mirrors the pick
+    chart, whose negative offsets are on the left, against the layer chart, whose x grows to the
+    right. Picks with no offset, or with the receiver and the source at the same x, don't count.
+    """
+    compared = opposite = 0
+    first_opposite_line = None
+    for (_, _, _, _, sou_x, _, rec_x, _, _, offset, *_), line_num in zip(rows, line_nums):
+        dx = rec_x - sou_x
+        if offset != 0 and abs(dx) >= _SAME_POSITION:
+            compared += 1
+            if (offset > 0) != (dx > 0):
+                opposite += 1
+                first_opposite_line = first_opposite_line or line_num
+    if 2 * opposite <= compared:
+        return None
+    return (f"OFFSET has the opposite sign of REC_X - SOU_X on {opposite} of the {compared} rows "
+            f"where both are non-zero, starting with line {first_opposite_line}, as if it were "
+            "SOU_X - REC_X. refrac expects negative offsets for receivers at a smaller X than the "
+            "source, so the left side of the pick chart, and the Left velocities, are on the "
+            "right side of the layer chart.")
 
 
 class PicksBin:
@@ -482,6 +569,11 @@ class Line:
         return self._picks_txt.stations
 
     @property
+    def warnings(self) -> list[str]:
+        """What looks wrong in the picks file without preventing reading it."""
+        return self._picks_txt.warnings
+
+    @property
     def shots_metadata(self) -> list[ShotMetadata]:
         return self._picks_txt.shots_metadata
 
@@ -497,7 +589,8 @@ class Line:
         picks_txt_path = home_dir / PICKS_TXT_NAME
         if not (picks_txt_path.exists() and picks_txt_path.samefile(picks_file)):
             shutil.copyfile(picks_file, picks_txt_path)
-        picks_txt = PicksTxt(picks_txt_path, picks_txt.shots, picks_txt.stations)
+        picks_txt = PicksTxt(picks_txt_path, picks_txt.shots, picks_txt.stations,
+                             picks_txt.warnings)
 
         return cls(
             home_dir,

@@ -17,6 +17,7 @@ def test_create_reads_shots_and_stations(line):
     assert [m.sou_stat for m in metadata[:3]] == [101, 111, 121]
     assert metadata[-1].sou_stat == 340
     assert [m.pick_amount for m in metadata[:3]] == [73, 83, 93]
+    assert line.warnings == []
 
 
 def test_load_shot(line):
@@ -175,11 +176,6 @@ def test_invalid_picks_files(tmp_path):
     with pytest.raises(ValueError, match="invalid line 2"):
         PicksTxt.open(short_row)
 
-    no_source_station = tmp_path / "no_source.dat"
-    no_source_station.write_text(f"{_PICKS_HEADER}\n1 100 101 0.0 0 0 0 0 10.0 0.0 101\n")
-    with pytest.raises(ValueError, match="source station 100"):
-        PicksTxt.open(no_source_station)
-
 
 def test_sou_elev_column_gives_the_source_elevation(tmp_path, synthetic_picks, sou_elev_picks):
     line = Line.create(tmp_path / "line", sou_elev_picks)
@@ -194,6 +190,49 @@ def test_sou_elev_column_gives_the_source_elevation(tmp_path, synthetic_picks, s
 def test_without_sou_elev_the_source_elevation_is_the_station_elevation(line):
     stations = {station.num: station for station in line.stations}
     assert all(m.sou_elev == stations[m.sou_stat].elev for m in line.shots_metadata)
+
+
+def test_without_sou_elev_the_source_elevation_comes_from_the_receivers_around_it(
+        tmp_path, channel_picks):
+    line = Line.create(tmp_path / "line", channel_picks)
+    # On the receiver at x = 20, halfway between those at 40 and 50, and past the last one at 80,
+    # weighted with the one at 70 rather than extrapolated
+    assert [m.sou_elev for m in line.shots_metadata] == [102.0, 104.5, 107.625]
+    assert [line.load_shot(i).sou_elev for i in range(3)] == [102.0, 104.5, 107.625]
+
+
+def test_without_sou_elev_a_lone_receiver_gives_the_source_elevation(tmp_path):
+    picks = tmp_path / "picks.dat"
+    picks.write_text(f"{_PICKS_HEADER}\n1 100 101 0.0 5 0 0 0 10.0 -5.0 101\n")
+    (shot,) = PicksTxt.open(picks).shots
+    assert (shot.sou_stat, shot.sou_elev) == (100, 10.0)
+
+
+def test_receivers_are_placed_by_position_whatever_their_numbering(channel_picks):
+    picks_txt = PicksTxt.open(channel_picks)
+    assert [(s.x, s.elev) for s in picks_txt.stations] == [(10.0 * n, 100.0 + n) for n in range(9)]
+    assert picks_txt.warnings == []
+
+
+def test_receiver_position_with_two_elevations_is_reported(channel_picks):
+    lines = channel_picks.read_text().splitlines()
+    # Shot 2's receiver at x = 30, first given at 103.0 by shot 1 on line 5
+    fields = lines[7].split()
+    fields[8] = "103.5"
+    lines[7] = " ".join(fields)
+    channel_picks.write_text("\n".join(lines) + "\n")
+    picks_txt = PicksTxt.open(channel_picks)
+    (warning,) = picks_txt.warnings
+    assert "at 1 of the 9 receiver positions" in warning
+    assert "(30.00, 0.00): 103.00 on line 5 and 103.50 on line 8" in warning
+    assert picks_txt.stations[3].elev == 103.0
+
+
+def test_offsets_of_the_opposite_sign_are_reported(flipped_offset_picks):
+    (warning,) = PicksTxt.open(flipped_offset_picks).warnings
+    # Shot 1's pick at its source has no offset, so it isn't compared
+    assert warning.startswith("OFFSET has the opposite sign of REC_X - SOU_X on 14 of the 14 "
+                              "rows where both are non-zero, starting with line 2")
 
 
 def test_sou_elev_column_does_not_need_a_source_station(tmp_path):

@@ -515,6 +515,8 @@ class MainWindow(QMainWindow):
             self._show_error("Cannot create line", str(e))
             return
         self.set_line(line)
+        if line.warnings:
+            self._show_warning("Check the picks file", "\n\n".join(line.warnings))
 
     def _on_open_line(self) -> None:
         line_dir = QFileDialog.getExistingDirectory(self, "Open Line", str(self.project.home_dir))

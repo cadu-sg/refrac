@@ -47,7 +47,7 @@ Your work is saved inside the project folder. Next time, use **Project → Open 
 
 ### Example data
 
-To try refrac out without picks of your own, use the example data: a seismic line of 301 shots and 321 stations. It's on the [Example data](https://github.com/cadu-sg/refrac/releases/tag/example-data) page of the releases.
+To try refrac out without picks of your own, use the example data: a seismic line of 301 shots and 601 receiver stations. It's on the [Example data](https://github.com/cadu-sg/refrac/releases/tag/example-data) page of the releases.
 
 1. Download [first_break_picks_example_1.zip](https://github.com/cadu-sg/refrac/releases/download/example-data/first_break_picks_example_1.zip) (about 1 MB).
 2. Unzip it to get the picks file, `first_break_picks_example_1.csv`. On Windows, right-click the downloaded file and choose **Extract All...**. On Linux, right-click it and choose **Extract Here** (the wording depends on your system), or run `unzip first_break_picks_example_1.zip` in a terminal.
@@ -64,19 +64,21 @@ A text file with one first-break pick per row. The first line is a header naming
 |---|---|
 | `FFID` | Shot sequential number |
 | `SOU_SLOC` | Source station number |
-| `SRF_SLOC` | Receiver station number |
+| `SRF_SLOC` | Receiver station number, or channel number within the shot |
 | `FB_PICK` | Travel time (ms) |
 | `SOU_X`, `SOU_Y` | Source coordinates |
 | `REC_X`, `REC_Y` | Receiver coordinates |
-| `REC_ELEV` | Receiver station elevation |
-| `OFFSET` | Signed source–receiver offset (m) |
+| `REC_ELEV` | Receiver elevation |
+| `OFFSET` | Signed source–receiver offset (m), negative for receivers at a smaller X than the source |
 | `CDP` | Station nearest to the source–receiver midpoint |
 | `SOU_ELEV` | Source elevation (optional) |
 
 - Columns are separated by spaces, tabs or semicolons.
 - Numbers may use a decimal point or a decimal comma, as long as the whole file uses the same one.
-- Without a `SOU_ELEV` column, a source takes the elevation of the receiver station with its station number.
+- Receivers are placed by their coordinates, so `SRF_SLOC` may number the channels of each shot instead of the stations of the line.
+- Without a `SOU_ELEV` column, a source takes the elevation of the receiver at its position or, between receivers, an elevation interpolated from the two nearest.
 - A shot is a run of consecutive rows with the same `FFID`.
+- When creating a line, refrac warns about a receiver position given more than one elevation, and about offsets whose sign is mostly opposite to `REC_X` − `SOU_X`.
 
 For an example, see the [example data](#example-data), which uses semicolons and decimal commas.
 
