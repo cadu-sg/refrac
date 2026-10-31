@@ -53,23 +53,27 @@ From now on, start refrac from the applications menu. [AppManager](https://githu
 
 ## Getting started
 
-1. **Project → New Project...** creates a project folder. A project holds any number of seismic lines.
-2. **Line → New Line...** asks for a title and a picks file. To try refrac out, use the [example data](#example-data).
-3. Step through the shots and draw the direct-wave and refracted-arrival lines over each travel-time curve. refrac computes velocities and thicknesses as you draw.
-4. Click **Save** after interpreting each shot. **Line → Export Interpretation...** writes a CSV file with one row per saved shot. Its columns are `FFID`, `SOU_SLOC`, `SOU_X`, `SOU_Y` and `SOU_ELEV` for the source, `V1` for the direct-wave velocity, `V2` to `V4` for the refracted-arrival velocities (m/s) and `Z1` to `Z3` for the elevations of the interfaces. A velocity averages the slowness of both sides of the shot, or uses the only side drawn. Values that can't be computed are left empty.
+<p align="center"><img src="docs/images/main-window.png" alt="refrac with an interpreted line: a shot's travel-time curve at the top, and the layers below the line at the bottom" width="960"></p>
 
-Your work is saved inside the project folder. Next time, use **Project → Open Project...** and **Line → Open Line...** to continue.
+This walkthrough uses the example data, a synthetic seismic line, so you can try refrac before using picks of your own.
+
+1. Download [example_picks_offset_2000m.zip](https://github.com/cadu-sg/refrac/releases/download/example-data/example_picks_offset_2000m.zip) (about 0.6 MB).
+2. Unzip it to get the picks file, `example_picks_offset_2000m.csv`. On Windows, right-click the downloaded file and choose **Extract All...**. On Linux, right-click it and choose **Extract Here** (the wording depends on your system), or run `unzip example_picks_offset_2000m.zip` in a terminal.
+3. In refrac, choose **Project → New Project...** and pick a folder for the project. A project holds any number of seismic lines.
+4. Choose **Line → New Line...** and type a title for the line. Click the **...** button next to **Picks File**, select `example_picks_offset_2000m.csv`, and click **OK**. refrac shows the first shot: its travel-time curve at the top, and the surface of the line at the bottom, with the shot marked.
+5. Draw lines over the travel-time curve: the direct wave, then up to three refracted arrivals, on each side of the shot. Select a line in the **Interpretation** box, then click its end points on the chart (the direct wave starts at the shot, so it needs one click). Lines are drawn from the shot outwards, so **Refracted 1** becomes available once **Direct** is drawn on that side. Once a line is drawn, its **Fit** button adjusts it to the picks between its intersections with the neighbouring lines (**Fit all** does every line), and right-clicking erases the nearest end point so you can place it again. The **Velocities** box updates as you draw.
+6. Click **Save** (or press **S**). The interfaces below the shot appear at the bottom.
+7. Go to the next shot with **>** (or **→**), or click the bottom chart to jump to the shot nearest to where you click. A new shot starts with the lines saved for the nearest shot before it, so you often only need to adjust them.
+8. When you've interpreted the shots you want, **Line → Export Interpretation...** writes a CSV file with one row per saved shot. Its columns are `FFID`, `SOU_SLOC`, `SOU_X`, `SOU_Y` and `SOU_ELEV` for the source, `V1` for the direct-wave velocity, `V2` to `V4` for the refracted-arrival velocities (m/s) and `Z1` to `Z3` for the elevations of the interfaces. A velocity averages the slowness of both sides of the shot, or uses the only side drawn. Values that can't be computed are left empty.
+
+Your work is saved inside the project folder. Next time, use **Project → Open Project...** and **Line → Open Line...** to continue. To interpret your own picks, create a line from your picks file in step 4; see [Picks file format](#picks-file-format).
 
 ### Example data
 
-To try refrac out without picks of your own, use the example data: two picks files of the same synthetic seismic line, 301 shots with receivers every 25 m. In `example_picks_offset_4000m`, the receivers go up to 4000 m from each shot; in `example_picks_offset_2000m`, up to 2000 m. They're on the [Example data](https://github.com/cadu-sg/refrac/releases/tag/example-data) page of the releases. These steps use the first:
+The [Example data](https://github.com/cadu-sg/refrac/releases/tag/example-data) page of the releases has two picks files of the same synthetic seismic line, 301 shots 50 m apart with receivers every 25 m:
 
-1. Download [example_picks_offset_4000m.zip](https://github.com/cadu-sg/refrac/releases/download/example-data/example_picks_offset_4000m.zip) (about 1 MB).
-2. Unzip it to get the picks file, `example_picks_offset_4000m.csv`. On Windows, right-click the downloaded file and choose **Extract All...**. On Linux, right-click it and choose **Extract Here** (the wording depends on your system), or run `unzip example_picks_offset_4000m.zip` in a terminal.
-3. In refrac, create a project with **Project → New Project...**, or open one with **Project → Open Project...**.
-4. Choose **Line → New Line...** and type a title for the line. Click the **...** button next to **Picks File**, select `example_picks_offset_4000m.csv`, and click **OK**.
-
-refrac shows the first shot of the line. Continue from step 3 of [Getting started](#getting-started).
+- [example_picks_offset_2000m.zip](https://github.com/cadu-sg/refrac/releases/download/example-data/example_picks_offset_2000m.zip): the receivers go up to 2000 m from each shot. Used in [Getting started](#getting-started).
+- [example_picks_offset_4000m.zip](https://github.com/cadu-sg/refrac/releases/download/example-data/example_picks_offset_4000m.zip): the receivers go up to 4000 m from each shot, so the refracted arrivals reach farther.
 
 ### Picks file format
 
