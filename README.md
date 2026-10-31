@@ -31,10 +31,25 @@ From now on, start refrac from the **Start menu** or from the **refrac** icon on
 
 ## Installing on Linux
 
+refrac for Linux is a single file, `refrac-linux-x86_64.AppImage`: the file *is* the program. You can either save it somewhere and run it from that folder when needed, or install an additional tool that can add it to the applications menu of your system.
+
+### Run AppImage directly (most straightforward)
+
 1. Click **Download for Linux** above.
-2. Move the downloaded file, `refrac-linux-x86_64.AppImage`, to a folder where you'll keep it, such as your home folder. The file *is* the program: there's nothing to install.
-3. Allow the file to run as a program, once. Right-click it, choose **Properties**, and turn on the option called **Executable as Program** or **Allow executing file as program**, depending on your system. (If you prefer the terminal: `chmod +x refrac-linux-x86_64.AppImage`.)
+2. Move the downloaded file, `refrac-linux-x86_64.AppImage`, to a folder where you'll keep it, such as your home folder.
+3. Allow the file to run as a program, once. Right-click it, choose **Properties**, open the **Permissions** tab if there is one, and turn on the option called **Executable as Program** or **Allow executing file as program**, depending on your system. (If you prefer the terminal: `chmod +x refrac-linux-x86_64.AppImage`.)
 4. Double-click the file to start refrac.
+
+### With an AppImage manager tool (adds refrac to the applications menu)
+
+[Gear Lever](https://gearlever.mijorus.it/) keeps AppImages in one place and gives them an entry in the applications menu, with refrac's icon.
+
+1. [Install Gear Lever from Flathub](https://flathub.org/en/apps/it.mijorus.gearlever). On Linux Mint and Fedora it's in the software manager; on Ubuntu, [set up Flatpak](https://flathub.org/setup/Ubuntu) first.
+2. Click **Download for Linux** above.
+3. Open Gear Lever and drag the downloaded file into its window.
+4. Click **Unlock** if Gear Lever asks, then **Move to the app menu**.
+
+From now on, start refrac from the applications menu. [AppManager](https://github.com/kem-a/AppManager) works the same way, if you prefer it: drag the file into it and follow its instructions.
 
 ## Getting started
 
@@ -87,21 +102,23 @@ For an example, see the [example data](#example-data), which uses semicolons and
 Download refrac again with the buttons above.
 
 - **Windows:** run the new installer. It replaces the old version.
-- **Linux:** replace the old AppImage file with the new one, and allow it to run as in step 3 of [Installing on Linux](#installing-on-linux).
+- **Linux, running the AppImage directly:** replace the old AppImage file with the new one, and allow it to run as in step 3 of [Run AppImage directly](#run-appimage-directly-most-straightforward).
+- **Linux with Gear Lever:** drag the new file into Gear Lever, which replaces the old version. To let Gear Lever look for updates itself, give it this address as refrac's update URL: `https://github.com/cadu-sg/refrac/releases/latest/download/refrac-linux-x86_64.AppImage`.
 
 Your projects are kept in their own folders, so updating doesn't touch them.
 
 ## Uninstalling
 
 - **Windows:** open **Settings → Apps → Installed apps**, find **refrac**, and choose **Uninstall**.
-- **Linux:** delete the AppImage file.
+- **Linux, running the AppImage directly:** delete the AppImage file.
+- **Linux with Gear Lever:** open Gear Lever, select **refrac** and remove it.
 
 Your projects stay where you saved them. Delete their folders too if you don't need them anymore.
 
 ## Troubleshooting
 
 - **Windows: the antivirus removed or blocked the file.** Some antivirus programs distrust new programs that aren't from a well-known publisher. Restore the file from the antivirus's quarantine, or ask whoever manages your computer to allow it.
-- **Linux: nothing happens when I double-click the file.** The file isn't allowed to run yet; see step 3 of [Installing on Linux](#installing-on-linux). If it still doesn't start, open a terminal in the file's folder and run `./refrac-linux-x86_64.AppImage` to see the error message.
+- **Linux: nothing happens when I double-click the file.** The file isn't allowed to run yet; see step 3 of [Run AppImage directly](#run-appimage-directly-most-straightforward). If it still doesn't start, open a terminal in the file's folder and run `./refrac-linux-x86_64.AppImage` to see the error message.
 - **Linux: the error mentions FUSE or `fusermount`.** Install FUSE (on Ubuntu or Debian: `sudo apt install fuse3`), or start refrac with `./refrac-linux-x86_64.AppImage --appimage-extract-and-run`.
 - **Something else went wrong?** [Open an issue](https://github.com/cadu-sg/refrac/issues) describing what you did and what happened.
 
