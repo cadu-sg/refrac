@@ -65,7 +65,6 @@ class LayerChart(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._plot_widget)
 
-        self._stations = {station.num: station for station in stations}
         surface = sorted(stations, key=lambda station: station.x)
         self._surface_x = np.array([s.x for s in surface], dtype=float)
         self._surface_elev = np.array([s.elev for s in surface], dtype=float)
@@ -158,9 +157,9 @@ class LayerChart(QWidget):
     def plot_shot_in_surface(self, shot: Shot) -> None:
         """Marks the receivers and the source of the shot on the surface, and the x of the source
         with a vertical line."""
-        receivers = [self._stations[num] for num in {pick.rec_stat for pick in shot.picks}
-                     if num in self._stations]
-        self._receivers.setData(x=[s.x for s in receivers], y=[s.elev for s in receivers])
+        # Each pick carries its receiver's position, which SRF_SLOC may not identify on its own
+        self._receivers.setData(x=[pick.rec_x for pick in shot.picks],
+                                y=[pick.rec_elev for pick in shot.picks])
         self._source.setData(x=[shot.sou_x], y=[shot.sou_elev])
         self._source_line.setValue(shot.sou_x)
         self._source_line.show()

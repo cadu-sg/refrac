@@ -578,6 +578,29 @@ def test_interfaces_and_source_hang_from_the_sou_elev_column(window, tmp_path, s
     assert elevation1 == pytest.approx(113.0 - h1)
 
 
+def test_receivers_are_marked_at_their_position_whatever_their_numbering(window,
+                                                                         channel_picks):
+    window.set_line(window.project.create_line("channels", channel_picks))
+    assert list(window.layer_chart._surface_x) == [10.0 * n for n in range(9)]
+    window.try_change_shot(2)
+    x, elevations = window.layer_chart._receivers.getData()
+    assert list(x) == [40.0, 50.0, 60.0, 70.0, 80.0]
+    assert list(elevations) == [104.0, 105.0, 106.0, 107.0, 108.0]
+
+
+def test_new_line_reports_the_warnings_of_its_picks_file(window, synthetic_picks,
+                                                        flipped_offset_picks, monkeypatch):
+    monkeypatch.setattr(NewLineDialog, "ask", lambda parent=None: ("synthetic", synthetic_picks))
+    window._on_new_line()
+    assert window.warnings == []
+    monkeypatch.setattr(NewLineDialog, "ask", lambda parent=None: ("flipped", flipped_offset_picks))
+    window._on_new_line()
+    ((header, content),) = window.warnings
+    assert header == "Check the picks file"
+    assert content.startswith("OFFSET has the opposite sign of REC_X - SOU_X")
+    assert window.line.title == "flipped"
+
+
 def test_undetectable_decimal_separator_is_reported(window, tmp_path, synthetic_picks,
                                                     monkeypatch):
     picks = tmp_path / "mixed.dat"
