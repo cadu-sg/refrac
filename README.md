@@ -47,12 +47,12 @@ Your work is saved inside the project folder. Next time, use **Project → Open 
 
 ### Example data
 
-To try refrac out without picks of your own, use the example data: a seismic line of 301 shots and 601 receiver stations. It's on the [Example data](https://github.com/cadu-sg/refrac/releases/tag/example-data) page of the releases.
+To try refrac out without picks of your own, use the example data: two picks files of the same synthetic seismic line, 301 shots with receivers every 25 m. In `example_picks_offset_4000m`, the receivers go up to 4000 m from each shot; in `example_picks_offset_2000m`, up to 2000 m. They're on the [Example data](https://github.com/cadu-sg/refrac/releases/tag/example-data) page of the releases. These steps use the first:
 
-1. Download [first_break_picks_example_1.zip](https://github.com/cadu-sg/refrac/releases/download/example-data/first_break_picks_example_1.zip) (about 1 MB).
-2. Unzip it to get the picks file, `first_break_picks_example_1.csv`. On Windows, right-click the downloaded file and choose **Extract All...**. On Linux, right-click it and choose **Extract Here** (the wording depends on your system), or run `unzip first_break_picks_example_1.zip` in a terminal.
+1. Download [example_picks_offset_4000m.zip](https://github.com/cadu-sg/refrac/releases/download/example-data/example_picks_offset_4000m.zip) (about 1 MB).
+2. Unzip it to get the picks file, `example_picks_offset_4000m.csv`. On Windows, right-click the downloaded file and choose **Extract All...**. On Linux, right-click it and choose **Extract Here** (the wording depends on your system), or run `unzip example_picks_offset_4000m.zip` in a terminal.
 3. In refrac, create a project with **Project → New Project...**, or open one with **Project → Open Project...**.
-4. Choose **Line → New Line...** and type a title for the line. Click the **...** button next to **Picks File**, select `first_break_picks_example_1.csv`, and click **OK**.
+4. Choose **Line → New Line...** and type a title for the line. Click the **...** button next to **Picks File**, select `example_picks_offset_4000m.csv`, and click **OK**.
 
 refrac shows the first shot of the line. Continue from step 3 of [Getting started](#getting-started).
 
