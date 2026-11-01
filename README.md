@@ -31,7 +31,7 @@ From now on, start refrac from the **Start menu** or from the **refrac** icon on
 
 ## Installing on Linux
 
-refrac for Linux is a single file, `refrac-linux-x86_64.AppImage`: the file *is* the program. You can either save it somewhere and run it from that folder when needed, or install an additional tool that can add it to the applications menu of your system.
+refrac for Linux is a single file, `refrac-linux-x86_64.AppImage`: the file *is* the program. You can either keep it in a folder and run it from there, or install an AppImage management tool that adds it to your system's applications menu.
 
 ### Run AppImage directly (most straightforward)
 
@@ -40,16 +40,27 @@ refrac for Linux is a single file, `refrac-linux-x86_64.AppImage`: the file *is*
 3. Allow the file to run as a program, once. Right-click it, choose **Properties**, open the **Permissions** tab if there is one, and turn on the option called **Executable as Program** or **Allow executing file as program**, depending on your system. (If you prefer the terminal: `chmod +x refrac-linux-x86_64.AppImage`.)
 4. Double-click the file to start refrac.
 
-### With an AppImage manager tool (adds refrac to the applications menu)
+### With an AppImage management tool (adds refrac to the applications menu)
 
-[Gear Lever](https://gearlever.mijorus.it/) keeps AppImages in one place and gives them an entry in the applications menu, with refrac's icon.
+An AppImage management tool keeps AppImages in one place and gives them an entry in the applications menu, with their icons. Two work well with refrac; pick the one that's easier to install on your computer:
 
-1. [Install Gear Lever from Flathub](https://flathub.org/en/apps/it.mijorus.gearlever). On Linux Mint and Fedora it's in the software manager; on Ubuntu, [set up Flatpak](https://flathub.org/setup/Ubuntu) first.
+- **[Gear Lever](https://gearlever.mijorus.it/)** is a Flatpak app from the Flathub repository, so it's the easier choice if your distribution comes with Flatpak and Flathub already set up, as Linux Mint does. [Set up Flathub](https://flathub.org/en/setup) tells you whether yours does.
+- **[AppManager](https://github.com/kem-a/AppManager)** is itself an AppImage, so it needs neither Flatpak nor an administrator password. Choose it if you can't install Flatpak apps: on Ubuntu and Debian, Flatpak isn't installed by default, and installing it needs `sudo`.
+
+#### Gear Lever
+
+1. Go to the [Gear Lever page on the Flathub website](https://flathub.org/en/apps/it.mijorus.gearlever) and click **Install**. (If you prefer the terminal: `flatpak install -y it.mijorus.gearlever`.)
 2. Click **Download for Linux** above.
 3. Open Gear Lever and drag the downloaded file into its window.
 4. Click **Unlock** if Gear Lever asks, then **Move to the app menu**.
 
-From now on, start refrac from the applications menu. [AppManager](https://github.com/kem-a/AppManager) works the same way, if you prefer it: drag the file into it and follow its instructions.
+#### AppManager
+
+1. Download the AppManager AppImage from its [releases](https://github.com/kem-a/AppManager/releases/latest), allow it to run as in step 3 of [Run AppImage directly](#run-appimage-directly-most-straightforward), and double-click it to install AppManager.
+2. Click **Download for Linux** above.
+3. Double-click the downloaded refrac file. AppManager opens a window where you drag refrac to install it.
+
+From now on, start refrac from the applications menu.
 
 ## Getting started
 
@@ -107,7 +118,7 @@ Download refrac again with the buttons above.
 
 - **Windows:** run the new installer. It replaces the old version.
 - **Linux, running the AppImage directly:** replace the old AppImage file with the new one, and allow it to run as in step 3 of [Run AppImage directly](#run-appimage-directly-most-straightforward).
-- **Linux with Gear Lever:** drag the new file into Gear Lever, which replaces the old version. To let Gear Lever look for updates itself, give it this address as refrac's update URL: `https://github.com/cadu-sg/refrac/releases/latest/download/refrac-linux-x86_64.AppImage`.
+- **Linux with Gear Lever or AppManager:** install the new file the same way, which replaces the old version. To let either tool look for updates itself, give it this address as refrac's update URL: `https://github.com/cadu-sg/refrac/releases/latest/download/refrac-linux-x86_64.AppImage`.
 
 Your projects are kept in their own folders, so updating doesn't touch them.
 
@@ -115,7 +126,7 @@ Your projects are kept in their own folders, so updating doesn't touch them.
 
 - **Windows:** open **Settings → Apps → Installed apps**, find **refrac**, and choose **Uninstall**.
 - **Linux, running the AppImage directly:** delete the AppImage file.
-- **Linux with Gear Lever:** open Gear Lever, select **refrac** and remove it.
+- **Linux with Gear Lever or AppManager:** open the tool, select **refrac** and remove it.
 
 Your projects stay where you saved them. Delete their folders too if you don't need them anymore.
 
