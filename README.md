@@ -42,9 +42,9 @@ refrac for Linux is a single file, `refrac-linux-x86_64.AppImage`: the file *is*
 
 ### With an AppImage management tool (adds refrac to the applications menu)
 
-An AppImage management tool keeps AppImages in one place and gives them an entry in the applications menu, with their icons. Two work well with refrac; pick the one that's easier to install on your computer:
+An AppImage management tool keeps AppImages in one place and gives them an entry in the applications menu, with their icons. Pick the one that's easier to install on your computer:
 
-- **[Gear Lever](https://gearlever.mijorus.it/)** is a Flatpak app from the Flathub repository, so it's the easier choice if your distribution comes with Flatpak and Flathub already set up, as Linux Mint does. [Set up Flathub](https://flathub.org/en/setup) tells you whether yours does.
+- **[Gear Lever](https://gearlever.mijorus.it/)** is a Flatpak app from the Flathub repository, so it's the easier choice if your distro comes with Flatpak and Flathub already set up (e.g. Linux Mint). Check [Set up Flathub](https://flathub.org/en/setup) to find out if that's the case for you.
 - **[AppManager](https://github.com/kem-a/AppManager)** is itself an AppImage, so it needs neither Flatpak nor an administrator password. Choose it if you can't install Flatpak apps: on Ubuntu and Debian, Flatpak isn't installed by default, and installing it needs `sudo`.
 
 #### Gear Lever
@@ -69,8 +69,8 @@ From now on, start refrac from the applications menu.
 This walkthrough uses the example data, a synthetic seismic line, so you can try refrac before using picks of your own.
 
 1. Download [example_picks_offset_2000m.zip](https://github.com/cadu-sg/refrac/releases/download/example-data/example_picks_offset_2000m.zip) (about 0.6 MB).
-2. Unzip it to get the picks file, `example_picks_offset_2000m.csv`. On Windows, right-click the downloaded file and choose **Extract All...**. On Linux, right-click it and choose **Extract Here** (the wording depends on your system), or run `unzip example_picks_offset_2000m.zip` in a terminal.
-3. In refrac, choose **Project → New Project...** and pick a folder for the project. A project holds any number of seismic lines.
+2. Unzip it to get the picks file, `example_picks_offset_2000m.csv`.
+3. In refrac, choose **Project → New Project...** and pick a folder for the project. A project holds any number of seismic lines, and you need one before creating a line.
 4. Choose **Line → New Line...** and type a title for the line. Click the **...** button next to **Picks File**, select `example_picks_offset_2000m.csv`, and click **OK**. refrac shows the first shot: its travel-time curve at the top, and the surface of the line at the bottom, with the shot marked.
 5. Draw lines over the travel-time curve: the direct wave, then up to three refracted arrivals, on each side of the shot. Select a line in the **Interpretation** box, then click its end points on the chart (the direct wave starts at the shot, so it needs one click). Lines are drawn from the shot outwards, so **Refracted 1** becomes available once **Direct** is drawn on that side. Once a line is drawn, its **Fit** button adjusts it to the picks between its intersections with the neighbouring lines (**Fit all** does every line), and right-clicking erases the nearest end point so you can place it again. The **Velocities** box updates as you draw.
 6. Click **Save** (or press **S**). The interfaces below the shot appear at the bottom.
